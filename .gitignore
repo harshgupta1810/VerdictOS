@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data & Logs (contents only, keep directories)
+data/uploads/*
+data/indices/*
+data/graphs/*
+logs/*
+!data/uploads/.gitkeep
+!data/indices/.gitkeep
+!data/graphs/.gitkeep
+!logs/.gitkeep
+
+# Docker volumes
+docker/volumes/
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml

@@ -1,0 +1,1 @@
+# VerdictOS package namespace
