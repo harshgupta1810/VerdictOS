@@ -135,68 +135,65 @@ def test_planner_activates_all_agents_for_unmatched_documents() -> None:
     assert [agent.value for agent in manifest.active_agents] == CORRECT_AGENT_IDS
 
 
-class _MockOllamaClient:
-    def __init__(self, response: Any) -> None:
-        self.response = response
-        self.calls = []
-
-    async def generate_with_schema(self, req: Any, schema_type: Any) -> Any:
-        self.calls.append(req)
-        if isinstance(self.response, Exception):
-            raise self.response
-        return self.response
-
-
 def test_planner_agent_llm_success() -> None:
     from typing import Any
+    from unittest.mock import patch, MagicMock
+    import json
     from src.agents.planner_agent import LLMPlannerOutput
 
     expected_output = LLMPlannerOutput(
         active_agents=["ip_agent", "finance_agent"],
         document_type_map={"doc1.pdf": "SPA", "doc2.pdf": "IP assignment"}
     )
-    mock_client = _MockOllamaClient(expected_output)
-    planner = PlannerAgent(ollama_client=mock_client)
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"response": json.dumps(expected_output.model_dump())}
     
-    manifest = planner.plan(
-        document_names=["doc1.pdf", "doc2.pdf"],
-        chunks=[
-            DocumentChunk(
-                chunk_id="doc1:0",
-                document_name="doc1.pdf",
-                chunk_index=0,
-                text="patent info",
-                section_id="Section 1",
-                absolute_page=0,
-                clause_type=ClauseType.GENERAL
-            )
-        ]
-    )
+    with patch("httpx.post", return_value=mock_resp) as mock_post:
+        planner = PlannerAgent()
+        manifest = planner.plan(
+            document_names=["doc1.pdf", "doc2.pdf"],
+            chunks=[
+                DocumentChunk(
+                    chunk_id="doc1:0",
+                    document_name="doc1.pdf",
+                    chunk_index=0,
+                    text="patent info",
+                    section_id="Section 1",
+                    absolute_page=0,
+                    clause_type=ClauseType.GENERAL
+                )
+            ]
+        )
     
     assert manifest.active_agents == [AgentName.IP, AgentName.FINANCE]
     assert manifest.used_fallback is False
     assert manifest.document_type_map == {"doc1.pdf": "SPA", "doc2.pdf": "IP assignment"}
-    assert len(mock_client.calls) == 1
-    assert "SPA" in mock_client.calls[0].system_prompt
-    assert "patent info" in mock_client.calls[0].user_prompt
-    assert "doc1.pdf" in mock_client.calls[0].user_prompt
+    mock_post.assert_called_once()
+    called_json = mock_post.call_args[1]["json"]
+    assert "SPA" in called_json["system"]
+    assert "patent info" in called_json["prompt"]
+    assert "doc1.pdf" in called_json["prompt"]
 
 
 def test_planner_agent_llm_empty_agents_fallback() -> None:
     from typing import Any
+    from unittest.mock import patch, MagicMock
+    import json
     from src.agents.planner_agent import LLMPlannerOutput
 
     expected_output = LLMPlannerOutput(
         active_agents=[],
         document_type_map={"doc1.pdf": "SPA"}
     )
-    mock_client = _MockOllamaClient(expected_output)
-    planner = PlannerAgent(ollama_client=mock_client)
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"response": json.dumps(expected_output.model_dump())}
     
-    manifest = planner.plan(
-        document_names=["doc1.pdf"],
-        chunks=[_chunk(text="patent assignment", clause_type=ClauseType.GENERAL)]
-    )
+    with patch("httpx.post", return_value=mock_resp):
+        planner = PlannerAgent()
+        manifest = planner.plan(
+            document_names=["doc1.pdf"],
+            chunks=[_chunk(text="patent assignment", clause_type=ClauseType.GENERAL)]
+        )
     
     assert AgentName.IP in manifest.active_agents
     assert manifest.used_fallback is True
@@ -204,17 +201,20 @@ def test_planner_agent_llm_empty_agents_fallback() -> None:
 
 
 def test_planner_agent_llm_failure_fallback() -> None:
-    mock_client = _MockOllamaClient(RuntimeError("Connection refused"))
-    planner = PlannerAgent(ollama_client=mock_client)
-    
-    manifest = planner.plan(
-        document_names=["doc1.pdf"],
-        chunks=[_chunk(text="patent assignment", clause_type=ClauseType.GENERAL)]
-    )
+    import httpx
+    from unittest.mock import patch
+
+    with patch("httpx.post", side_effect=httpx.HTTPError("Connection refused")):
+        planner = PlannerAgent()
+        manifest = planner.plan(
+            document_names=["doc1.pdf"],
+            chunks=[_chunk(text="patent assignment", clause_type=ClauseType.GENERAL)]
+        )
     
     assert manifest.active_agents == [AgentName.IP]
     assert manifest.used_fallback is False
     assert manifest.document_type_map == {}
+
 
 
 def _chunk(
