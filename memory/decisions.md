@@ -99,3 +99,17 @@ We omit granular RBAC scope validation from the immediate FastAPI gateway implem
 ### Consequences
 - **Pros:** Accelerated gateway routing development and simpler unit tests.
 - **Cons:** Temporary lack of granular permission levels in early builds.
+
+---
+
+## ADR 008: Canonical Clause Types and Stable Specialist IDs
+
+### Context
+Clause classification feeds ingestion, Elasticsearch filters, and specialist retrieval. Planner identifiers also flow into Phase 2 dispatch. Divergent strings at these boundaries would require downstream rewrites and weaken auditability.
+
+### Decision
+We define the shared nine-value `ClauseType` enum in `src/common/models.py` and use the canonical `clause_type` field throughout ingestion, indexing, and query construction. We also lock the planner registry to the approved 16 `agent_name` values and expand vocabulary with per-agent query-time synonym dictionaries.
+
+### Consequences
+- **Pros:** Stable cross-module contracts, deterministic routing, and synonym updates without index rebuilds.
+- **Cons:** Taxonomy or specialist-ID changes now require an explicit contract migration.

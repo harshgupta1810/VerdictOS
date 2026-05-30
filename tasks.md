@@ -25,44 +25,50 @@ This task list tracks the execution progress of VerdictOS development, broken do
   - [x] Include dependencies: `fastapi`, `uvicorn`, `pydantic>=2.0`, `pdfplumber`, `python-docx`, `spacy`, `networkx`, `elasticsearch`, `sqlalchemy`, `asyncio`, `redis`, `celery`, `pytest`, `httpx`, `httpx-sse`
 - [x] Initialize local environment configuration (`.env.example` and config parsing modules)
 
-## Phase 3: Document Ingestion, Parsing & Chunking
-- [ ] Implement Document Ingest & Parser (`src/ingestion/ingest.py`)
-  - [ ] Set up `pdfplumber` exception-safe document extraction
-  - [ ] Implement layout coordinate parser tracking page boundaries
-  - [ ] Implement sorting engine to resolve multi-column alignment sequences
-  - [ ] Set up `python-docx` paragraph and table ingestion
-  - [ ] Implement style/font triggers to isolate section header boundaries
-- [ ] Implement Chunker (`src/ingestion/chunker.py`)
-  - [ ] Build semantic clause splitter (split on periods, semicolons, and carriage returns)
-  - [ ] Build token sliding chunk assembler limiting sizing between 200 and 500 tokens
-  - [ ] Enrich chunks with metadata context (`section_id`, `absolute_page`)
-  - [ ] Write regex parser to extract cross-referenced sections (`references_sections`)
-- [ ] Implement Classifier (`src/ingestion/classifier.py`)
-  - [ ] Define keyword mapping dictionaries mapping chunks to taxonomy tags (tax, IP, HR, assets)
-  - [ ] Write classifier lookup routing logic with fallback `'general'` tag for sparse matches
+## Phase 3: Document Ingestion, Parsing & Chunking (100% Complete)
+- [x] Implement Document Ingest & Parser (`src/ingestion/ingest.py`)
+  - [x] Set up `pdfplumber` exception-safe document extraction
+  - [x] Implement layout coordinate parser tracking page boundaries
+  - [x] Implement sorting engine to resolve multi-column alignment sequences
+  - [x] Set up `python-docx` paragraph and table ingestion
+  - [x] Implement style/font triggers to isolate section header boundaries
+- [x] Implement Chunker (`src/ingestion/chunker.py`)
+  - [x] Build semantic clause splitter (split on periods, semicolons, and carriage returns)
+  - [x] Build non-overlapping token chunk assembler limiting sizing between 200 and 500 tokens
+  - [x] Enrich chunks with metadata context (`section_id`, `absolute_page`)
+  - [x] Write regex parser to extract cross-referenced sections (`references_sections`)
+- [x] Implement Classifier (`src/ingestion/classifier.py`)
+  - [x] Define keyword mapping dictionaries for the canonical `ClauseType` taxonomy
+  - [x] Write classifier lookup routing logic with fallback `'general'` tag for uncertain or sparse matches
 
-## Phase 4: Entity Resolution & GraphRAG Constructor
-- [ ] Implement 3-Tier Entity Resolution (`src/graphrag/entity_resolver.py`)
-  - [ ] Tier 1: Case-insensitive exact string match and punctuation trim
-  - [ ] Tier 2: Fuzzy distance match checks utilizing Levenshtein distance rules (ratio > 0.85)
-  - [ ] Tier 3: Local open-source model prompt (Ollama) resolving ambiguous nodes
-  - [ ] Implement resolution cache registry mapping duplicates to reduce LLM overhead
-  - [ ] Tag unresolved links as `unconfirmed_node` to maintain database separation
-- [ ] Implement Knowledge Graph Constructor (`src/graphrag/graph_constructor.py`)
-  - [ ] Set up spaCy Named Entity Recognition (NER) pipeline mapping Organizations, Persons, Assets
-  - [ ] Build NetworkX DiGraph mapper tracking cross-document entity relationships
-  - [ ] Write serialization/deserialization utilities to load/store graph states on disk
+## Phase 4: Entity Resolution & GraphRAG Constructor (100% Complete)
+- [x] Implement 3-Tier Entity Resolution (`src/graphrag/entity_resolver.py`)
+  - [x] Tier 1: Case-insensitive exact string match and punctuation trim
+  - [x] Tier 2: Fuzzy distance match checks utilizing Levenshtein distance rules (ratio > 0.85)
+  - [x] Tier 3: Local open-source model prompt (Ollama) resolving ambiguous nodes
+  - [x] Implement resolution cache registry mapping duplicates to reduce LLM overhead
+  - [x] Tag unresolved links as `unconfirmed_node` to maintain database separation
+- [x] Implement Knowledge Graph Constructor (`src/graphrag/graph_constructor.py`)
+  - [x] Set up spaCy Named Entity Recognition (NER) pipeline mapping Organizations, Persons, Locations, Assets, and Codes
+  - [x] Build NetworkX DiGraph mapper tracking cross-document entity relationships
+  - [x] Write serialization/deserialization utilities to load/store graph states on disk
 
-## Phase 5: Vectorless Sparse Retrieval Index (Elasticsearch)
-- [ ] Setup Search Engine (`src/search/search_engine.py`)
-  - [ ] Set up Elasticsearch connection client mapping to local port 9200
-  - [ ] Define Elasticsearch index mapping schema (`text`, `section_id`, `absolute_page`, `taxonomy_tag`, `references_sections`)
-  - [ ] Write Elasticsearch bulk indexer loading parsed chunks in batches
-- [ ] Implement BM25 Search Queries (`src/search/search_engine.py`)
-  - [ ] Build BM25 sparse matching queries filtering by document name or taxonomy type
-  - [ ] Implement exact matches and metadata highlight extraction
-- [ ] Implement Incremental Updates (`src/search/search_engine.py`)
-  - [ ] Write update queries to index new document additions without rebuilding index
+## Phase 5: Vectorless Sparse Retrieval Index (Elasticsearch) (100% Complete)
+- [x] Setup Search Engine (`src/search/search_engine.py`)
+  - [x] Set up Elasticsearch connection client mapping to local port 9200
+  - [x] Define Elasticsearch index mapping schema (`text`, `section_id`, `absolute_page`, `clause_type`, `references_sections`)
+  - [x] Write Elasticsearch bulk indexer loading parsed chunks in batches
+- [x] Implement BM25 Search Queries (`src/search/search_engine.py`)
+  - [x] Build BM25 sparse matching queries filtering by document name or clause type
+  - [x] Implement exact metadata filters and highlight extraction
+- [x] Implement Incremental Updates (`src/search/search_engine.py`)
+  - [x] Write deterministic upserts to index new document additions without rebuilding index
+
+## Runtime Phase 2 Contract Preparation (Pulled Forward)
+- [x] Define the approved 16-specialist `agent_name` registry
+- [x] Define per-agent query-time synonym dictionaries
+- [x] Build deterministic planner routing and all-agent fallback
+- [x] Compose synchronous pre-flight execution (`src/preflight.py`)
 
 ## Phase 6: Multi-Agent Orchestration & Debate Engine (DebateOS)
 - [ ] Implement Pydantic V2 schemas (`src/debate/schemas.py`)
@@ -104,10 +110,10 @@ This task list tracks the execution progress of VerdictOS development, broken do
 
 ## Phase 8: Verification & Cleanup
 - [ ] Write test configurations under `/tests`
-  - [ ] Create parser and chunker unit tests (`tests/test_ingestion.py`)
-  - [ ] Create entity resolution and graph constructor test suites (`tests/test_graphrag.py`)
-  - [ ] Create Elasticsearch search engine test suite (`tests/test_search.py`)
+  - [x] Create parser and chunker unit tests (`tests/unit/test_ingestion/`)
+  - [x] Create entity resolution and graph constructor test suites (`tests/unit/test_graphrag/`)
+  - [x] Create Elasticsearch search engine test suite (`tests/unit/test_search/`)
   - [ ] Create mock API tests for the debate engine loop (`tests/test_debate.py`)
   - [ ] Create integration tests targeting API endpoints (`tests/test_api.py`)
 - [ ] Validate database integrity constraints by attempting forbidden updates/deletes
-- [ ] Clean up temporary debug scripts or scrap files before marking complete
+- [x] Clean up temporary debug scripts or scrap files before marking complete

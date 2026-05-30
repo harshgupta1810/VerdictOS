@@ -43,8 +43,8 @@ This document outlines the detailed specifications, inputs, outputs, and interfa
 * **Module Path:** `src/ingestion/classifier.py`
 * **Responsibilities:**
   - Run rule-based heuristic patterns (regex/keyword search) over each text chunk to map to legal/operational taxonomy.
-  - Standard Taxonomy Tags: `tax_provision`, `ip_assignment`, `termination_clause`, `departure_covenant`, `non_compete`, `liability_limit`, `governing_law`.
-  - Apply conservative tag `'general'` if boundaries are ambiguous.
+  - Canonical `ClauseType` values: `tax_provision`, `ip_assignment`, `liability_cap`, `fx_hedging`, `employment_term`, `change_of_control`, `indemnification`, `data_protection`, `general`.
+  - Apply conservative tag `'general'` if boundaries are ambiguous or classification confidence is below `0.7`.
 
 ---
 
@@ -98,6 +98,11 @@ This document outlines the detailed specifications, inputs, outputs, and interfa
 - **8 Dimensions:** Risk Exposure, Valuation Fairness, Strategic Fit, Synergy Validity, Integration Complexity, Market Timing, Regulatory Approval, Exit Scenario.
 - **Dimension Gating:** Skip debates for dimensions containing fewer than 3 verified findings, writing sparse findings directly to the final gap report.
 - **6 Personas:** Proponent, Critic, Devil's Advocate, Valuation Skeptic, Integration Realist, Regulator's Eye.
+
+### Specialist Dispatch Contract
+- The synchronous pre-flight pipeline emits an active-specialist manifest before Phase 2 execution.
+- Canonical agent IDs: `ip_agent`, `litigation_agent`, `regulatory_agent`, `privacy_agent`, `finance_agent`, `tax_agent`, `insurance_agent`, `hr_agent`, `governance_agent`, `related_party_agent`, `cyber_agent`, `assets_agent`, `supplier_agent`, `customer_agent`, `reputation_agent`, `esg_agent`.
+- Per-agent synonym dictionaries expand BM25 queries at request time without rebuilding the index.
 
 ### The Steelman Rule Contract
 - Every response from an adversarial persona must populate a non-empty `steelman` JSON property within their output schemas. If missing, the Pydantic middleware fails validation and triggers a schema retry.

@@ -41,6 +41,8 @@ docker/volumes/
 
 # Test artifacts
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 htmlcov/
 .coverage
 coverage.xml

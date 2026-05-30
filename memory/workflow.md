@@ -29,7 +29,7 @@ Phase 7: Verdict & Human Loop (FastAPI API)
 ```
 
 ### Phase 1: Ingestion & Structural Indexing (Pre-Flight)
-- **Description:** Documents (PDF/DOCX) are ingested, mapped for page coordinates, and split into clause-level chunks (200-500 tokens). spaCy NER extracts entities and feeds the 3-Tier Entity Resolver. A pre-flight NetworkX DiGraph is generated, and document chunks are indexed in Elasticsearch.
+- **Description:** Documents (PDF/DOCX) are ingested, mapped for page coordinates, and split into clause-level chunks (200-500 tokens). spaCy NER extracts entities and feeds the 3-Tier Entity Resolver. A pre-flight NetworkX DiGraph is generated, document chunks are indexed in Elasticsearch, and a deterministic active-specialist manifest is emitted for Phase 2.
 - **Key Modules:** `src/ingestion/ingest.py`, `src/ingestion/chunker.py`, `src/graphrag/graph_constructor.py`, `src/search/search_engine.py`.
 - **Developer Action:** Set up Elasticsearch indices, define NetworkX serializers, and run parser tests using `pytest tests/test_ingestion.py`.
 
