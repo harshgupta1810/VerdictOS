@@ -34,6 +34,9 @@ from src.search.schemas import IndexingOutcome
 # Dry-run stub — used when Elasticsearch is unreachable
 # ---------------------------------------------------------------------------
 
+from collections.abc import Iterable
+
+
 class _DryRunIndexer:
     """Accepts chunks without writing to ES. Reports attempted = indexed."""
 
@@ -42,8 +45,9 @@ class _DryRunIndexer:
     def ensure_index(self) -> bool:
         return False
 
-    def index_chunks(self, chunks: list[DocumentChunk]) -> IndexingOutcome:
-        return IndexingOutcome(attempted=len(chunks), indexed=len(chunks))
+    def index_chunks(self, chunks: Iterable[DocumentChunk]) -> IndexingOutcome:
+        chunk_list = list(chunks)
+        return IndexingOutcome(attempted=len(chunk_list), indexed=len(chunk_list))
 
 
 def _build_indexer(*, wait_seconds: int = 60) -> ElasticsearchIndexer | _DryRunIndexer:

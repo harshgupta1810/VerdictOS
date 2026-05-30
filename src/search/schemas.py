@@ -22,6 +22,7 @@ class IndexedChunk(BaseModel):
     absolute_page: int = Field(ge=0)
     clause_type: ClauseType
     references_sections: list[str] = Field(default_factory=list)
+    defined_terms: dict[str, str] = Field(default_factory=dict)
 
     @classmethod
     def from_document_chunk(cls, chunk: DocumentChunk) -> "IndexedChunk":
@@ -33,7 +34,9 @@ class IndexedChunk(BaseModel):
             absolute_page=chunk.absolute_page,
             clause_type=chunk.clause_type,
             references_sections=chunk.references_sections,
+            defined_terms=chunk.defined_terms,
         )
+
 
 
 class IndexingOutcome(BaseModel):

@@ -35,6 +35,14 @@ CLAUSE_TYPE_TERMS: Mapping[ClauseType, Sequence[str]] = {
     ClauseType.CHANGE_OF_CONTROL: ("change of control", "acquisition", "merger", "assignment consent"),
     ClauseType.INDEMNIFICATION: ("indemnification", "indemnify", "hold harmless", "defend"),
     ClauseType.DATA_PROTECTION: ("personal data", "privacy", "data protection", "gdpr", "ccpa"),
+    ClauseType.INSURANCE_POLICY: ("insurance", "policy", "coverage", "premium", "insurer", "underwriting"),
+    ClauseType.GOVERNANCE_CLAUSE: ("bylaws", "board of directors", "shareholder agreement", "cap table", "voting rights"),
+    ClauseType.RELATED_PARTY_TRANSACTION: ("related party", "affiliate transaction", "beneficial owner", "conflict of interest"),
+    ClauseType.CYBER_SECURITY: ("cybersecurity", "information security", "data breach", "it system", "source code"),
+    ClauseType.SUPPLIER_CONTRACT: ("supplier", "vendor", "supply chain", "procurement", "distributor"),
+    ClauseType.CUSTOMER_CONTRACT: ("customer contract", "revenue concentration", "key account", "renewal term", "accounts receivable"),
+    ClauseType.REPUTATION_RISK: ("adverse media", "reputation", "misconduct", "corruption", "whistleblower"),
+    ClauseType.ESG_OBLIGATION: ("environmental", "emissions", "hazardous waste", "sustainability", "esg"),
 }
 
 

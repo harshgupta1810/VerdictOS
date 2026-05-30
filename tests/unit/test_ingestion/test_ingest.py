@@ -129,7 +129,7 @@ def test_docx_parser_extracts_headings_tables_and_logical_pages(tmp_path: Path) 
     table.cell(1, 1).text = "Owned"
     document.add_page_break()
     document.add_paragraph("Section 2. Privacy")
-    document.save(docx_path)
+    document.save(str(docx_path))
 
     parsed = DocumentIngestor().parse(docx_path)
 
@@ -149,7 +149,7 @@ def test_docx_parser_uses_page_zero_without_explicit_breaks(tmp_path: Path) -> N
     docx_path = tmp_path / "single-page.docx"
     document = Document()
     document.add_paragraph("One logical page.")
-    document.save(docx_path)
+    document.save(str(docx_path))
 
     parsed = DocumentIngestor().parse(docx_path)
 
@@ -210,3 +210,17 @@ def _write_pdf(path: Path, pages: list[list[tuple[int, int, str]]]) -> None:
         output.extend(f"{offset:010d} 00000 n \n".encode())
     output.extend(f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode())
     path.write_bytes(output)
+
+
+def test_compute_file_fingerprint(tmp_path: Path) -> None:
+    from src.ingestion.ingest import compute_file_fingerprint
+    f1 = tmp_path / "f1.txt"
+    f1.write_text("hello", encoding="utf-8")
+    f2 = tmp_path / "f2.txt"
+    f2.write_text("hello", encoding="utf-8")
+    f3 = tmp_path / "f3.txt"
+    f3.write_text("world", encoding="utf-8")
+
+    assert compute_file_fingerprint(f1) == compute_file_fingerprint(f2)
+    assert compute_file_fingerprint(f1) != compute_file_fingerprint(f3)
+

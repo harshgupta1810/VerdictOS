@@ -18,6 +18,14 @@ from src.ingestion.schemas import DocumentChunk
         (ClauseType.CHANGE_OF_CONTROL, "A change of control occurs upon an acquisition."),
         (ClauseType.INDEMNIFICATION, "Seller shall indemnify and hold harmless the buyer."),
         (ClauseType.DATA_PROTECTION, "Personal data processing complies with GDPR."),
+        (ClauseType.INSURANCE_POLICY, "The insurer shall maintain coverage and pay the premium."),
+        (ClauseType.GOVERNANCE_CLAUSE, "The shareholder agreement governs the cap table and voting rights."),
+        (ClauseType.RELATED_PARTY_TRANSACTION, "The related party transaction requires board approval by the beneficial owner."),
+        (ClauseType.CYBER_SECURITY, "The cybersecurity policy covers the it system and source code."),
+        (ClauseType.SUPPLIER_CONTRACT, "The supplier and distributor agree on procurement terms."),
+        (ClauseType.CUSTOMER_CONTRACT, "The customer contract specifies renewal term and accounts receivable."),
+        (ClauseType.REPUTATION_RISK, "Adverse media relating to misconduct may trigger a reputation clause."),
+        (ClauseType.ESG_OBLIGATION, "The esg policy covers emissions and sustainability reporting."),
     ],
 )
 def test_classifier_returns_each_locked_clause_type(clause_type: ClauseType, text: str) -> None:

@@ -5,6 +5,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Step 5: Download spaCy en_core_web_lg model at build time
+RUN python -m spacy download en_core_web_lg
+
 COPY src/ ./src/
 
 CMD ["celery", "-A", "src.workers.celery_app", "worker", "--loglevel=info"]

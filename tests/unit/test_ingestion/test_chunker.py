@@ -62,6 +62,38 @@ def test_chunker_splits_individually_oversized_clauses_and_keeps_short_documents
     assert short_chunks[0].text == "Short agreement."
 
 
+def test_chunker_merges_undersized_trailing_group_into_previous_same_section() -> None:
+    # Build one large clause (~300 tokens) followed by a tiny one (~5 tokens),
+    # both in the same section/page. The tiny group should be folded up.
+    big_clause = " ".join(f"word{i}" for i in range(300))
+    small_clause = "Short tail clause."
+    document = _document([f"{big_clause} {small_clause}"])
+
+    chunks = SectionAwareChunker(min_tokens=200, max_tokens=500).chunk(document)
+
+    # The trailing short clause should be merged into the preceding chunk.
+    assert len(chunks) == 1
+    assert "Short tail clause" in chunks[0].text
+
+
+def test_chunker_does_not_merge_across_section_boundaries() -> None:
+    # Two sections: each has content, the second section only has a tiny clause.
+    # The tiny clause must NOT merge into the first section's chunk.
+    big_clause = " ".join(f"word{i}" for i in range(250))
+    document = _document(
+        [
+            f"Section 1. Assets\n{big_clause}",
+            "Section 2. Privacy\nTiny.",
+        ]
+    )
+
+    chunks = SectionAwareChunker(min_tokens=200, max_tokens=500).chunk(document)
+
+    assert len(chunks) == 2
+    assert chunks[0].section_id == "Section 1"
+    assert chunks[1].section_id == "Section 2"
+
+
 def test_chunker_rejects_invalid_bounds() -> None:
     try:
         SectionAwareChunker(min_tokens=0)
@@ -85,3 +117,58 @@ def _document(pages: list[str]) -> ParsedDocument:
         document_type="pdf",
         raw_pages=[ParsedPage(page_index=index, text=text) for index, text in enumerate(pages)],
     )
+
+
+def test_defined_terms_extraction() -> None:
+    from src.ingestion.defined_terms import DefinedTermsExtractor
+    from src.ingestion.schemas import DocumentChunk
+
+    document = ParsedDocument(
+        document_name="agreement.pdf",
+        source_path="agreement.pdf",
+        document_type="pdf",
+        raw_pages=[
+            ParsedPage(
+                page_index=0,
+                text=(
+                    "Section 1. Definitions\n"
+                    '\"Affiliate\" shall mean any entity that controls Acme.\n'
+                    '\"Intellectual Property\" means all patents and trademarks.\n'
+                    "Section 2. Assets\n"
+                    "This section lists assets."
+                )
+            )
+        ]
+    )
+
+    extractor = DefinedTermsExtractor()
+    definitions = extractor.extract_definitions(document)
+
+    assert "Affiliate" in definitions
+    assert definitions["Affiliate"] == "any entity that controls Acme"
+    assert "Intellectual Property" in definitions
+    assert definitions["Intellectual Property"] == "all patents and trademarks"
+
+    chunk1 = DocumentChunk(
+        chunk_id="chunk:1",
+        document_name="agreement.pdf",
+        chunk_index=0,
+        text="The Affiliate of the vendor is Acme Holdings.",
+        section_id="Section 2",
+        absolute_page=0
+    )
+    chunk2 = DocumentChunk(
+        chunk_id="chunk:2",
+        document_name="agreement.pdf",
+        chunk_index=1,
+        text="This is an unrelated chunk.",
+        section_id="Section 2",
+        absolute_page=0
+    )
+
+    mapped = extractor.map_defined_terms_to_chunks([chunk1, chunk2], definitions)
+    assert "Affiliate" in mapped[0].defined_terms
+    assert mapped[0].defined_terms["Affiliate"] == "any entity that controls Acme"
+    assert "Intellectual Property" not in mapped[0].defined_terms
+    assert mapped[1].defined_terms == {}
+

@@ -74,6 +74,8 @@ class DocumentChunk(BaseModel):
     clause_type: ClauseType = ClauseType.GENERAL
     classification_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     matched_terms: list[str] = Field(default_factory=list)
+    defined_terms: dict[str, str] = Field(default_factory=dict)
+
 
 
 class ClassificationResult(BaseModel):

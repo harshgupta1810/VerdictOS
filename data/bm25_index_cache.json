@@ -1,0 +1,85 @@
+[
+  {
+    "chunk_id": "agreement:0:stable",
+    "document_name": "agreement.pdf",
+    "chunk_index": 0,
+    "text": "Updated version.",
+    "section_id": "Section 1",
+    "absolute_page": 0,
+    "references_sections": [
+      "Section 9.4"
+    ],
+    "clause_type": "liability_cap",
+    "classification_confidence": 0.0,
+    "matched_terms": [],
+    "defined_terms": {}
+  },
+  {
+    "chunk_id": "first:0",
+    "document_name": "first.pdf",
+    "chunk_index": 0,
+    "text": "The liability cap applies.",
+    "section_id": "Section 1",
+    "absolute_page": 0,
+    "references_sections": [
+      "Section 9.4"
+    ],
+    "clause_type": "liability_cap",
+    "classification_confidence": 0.0,
+    "matched_terms": [],
+    "defined_terms": {}
+  },
+  {
+    "chunk_id": "supplement:0",
+    "document_name": "supplement.pdf",
+    "chunk_index": 0,
+    "text": "The liability cap applies.",
+    "section_id": "Section 1",
+    "absolute_page": 0,
+    "references_sections": [
+      "Section 9.4"
+    ],
+    "clause_type": "liability_cap",
+    "classification_confidence": 0.0,
+    "matched_terms": [],
+    "defined_terms": {}
+  },
+  {
+    "chunk_id": "privacy-review.docx:0:64ee74907dd4b7ac",
+    "document_name": "privacy-review.docx",
+    "chunk_index": 0,
+    "text": "Section 1. Privacy Acme Corp. and Acme Holdings process personal data under GDPR.",
+    "section_id": "Section 1",
+    "absolute_page": 0,
+    "references_sections": [
+      "Section 1"
+    ],
+    "clause_type": "data_protection",
+    "classification_confidence": 0.8999999999999999,
+    "matched_terms": [
+      "personal data",
+      "privacy",
+      "gdpr"
+    ],
+    "defined_terms": {}
+  },
+  {
+    "chunk_id": "privacy-review.docx:0:ef775864977b4ac3",
+    "document_name": "privacy-review.docx",
+    "chunk_index": 0,
+    "text": "Section 1. Privacy Acme Corp. and Acme Corporation process personal data under GDPR.",
+    "section_id": "Section 1",
+    "absolute_page": 0,
+    "references_sections": [
+      "Section 1"
+    ],
+    "clause_type": "data_protection",
+    "classification_confidence": 0.8999999999999999,
+    "matched_terms": [
+      "personal data",
+      "privacy",
+      "gdpr"
+    ],
+    "defined_terms": {}
+  }
+]

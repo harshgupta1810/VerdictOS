@@ -1,6 +1,8 @@
 """Integration tests for synchronous Phase 1 pre-flight composition."""
 
 from pathlib import Path
+from typing import Any, cast
+from collections.abc import Iterable
 
 import networkx as nx
 import pytest
@@ -71,9 +73,10 @@ class _Indexer:
         self.calls.append("ensure_index")
         return True
 
-    def index_chunks(self, chunks: list[DocumentChunk]) -> IndexingOutcome:
-        self.calls.append(f"index:{len(chunks)}")
-        return IndexingOutcome(attempted=len(chunks), indexed=len(chunks) - len(self.errors), errors=self.errors)
+    def index_chunks(self, chunks: Iterable[DocumentChunk]) -> IndexingOutcome:
+        chunks_list = list(chunks)
+        self.calls.append(f"index:{len(chunks_list)}")
+        return IndexingOutcome(attempted=len(chunks_list), indexed=len(chunks_list) - len(self.errors), errors=self.errors)
 
 
 class _Planner:
@@ -117,7 +120,7 @@ class _NLP:
         return _Document(
             [
                 _Entity("Acme Corp.", "ORG"),
-                _Entity("Acme Holdings", "ORG"),
+                _Entity("Acme Corporation", "ORG"),
             ]
         )
 
@@ -175,17 +178,17 @@ def test_preflight_pipeline_processes_temporary_document_end_to_end(tmp_path: Pa
     source_path = tmp_path / "privacy-review.docx"
     source = Document()
     source.add_heading("Section 1. Privacy", level=1)
-    source.add_paragraph("Acme Corp. and Acme Holdings process personal data under GDPR.")
-    source.save(source_path)
+    source.add_paragraph("Acme Corp. and Acme Corporation process personal data under GDPR.")
+    source.save(str(source_path))
     ollama = _Ollama()
     elasticsearch = _ElasticsearchClient()
-    indexed_actions: list[dict[str, object]] = []
+    indexed_actions: list[dict[str, Any]] = []
 
     def bulk_writer(
         _client: object,
-        actions: list[dict[str, object]],
-        **_kwargs: object,
-    ) -> tuple[int, list[dict[str, object]]]:
+        actions: list[dict[str, Any]],
+        **_kwargs: Any,
+    ) -> tuple[int, list[dict[str, Any]]]:
         indexed_actions.extend(actions)
         return len(actions), []
 
@@ -218,7 +221,7 @@ def test_preflight_pipeline_processes_temporary_document_end_to_end(tmp_path: Pa
         for _, attributes in result.graph.nodes(data=True)
         if attributes["node_type"] == "entity"
     ]
-    assert entity_nodes[0]["aliases"] == ["Acme Corp.", "Acme Holdings"]
+    assert entity_nodes[0]["aliases"] == ["Acme Corp.", "Acme Corporation"]
     assert len(ollama.calls) == 1
 
 
@@ -228,12 +231,12 @@ def _pipeline(
     index_errors: list[dict[str, object]] | None = None,
 ) -> PreflightPipeline:
     return PreflightPipeline(
-        ingestor=_Ingestor(calls),
-        chunker=_Chunker(calls),
-        classifier=_Classifier(calls),
-        graph_constructor=_GraphConstructor(calls),
-        indexer=_Indexer(calls, errors=index_errors),
-        planner=_Planner(calls),
+        ingestor=cast(Any, _Ingestor(calls)),
+        chunker=cast(Any, _Chunker(calls)),
+        classifier=cast(Any, _Classifier(calls)),
+        graph_constructor=cast(Any, _GraphConstructor(calls)),
+        indexer=cast(Any, _Indexer(calls, errors=index_errors)),
+        planner=cast(Any, _Planner(calls)),
     )
 
 
@@ -246,3 +249,26 @@ def _chunk() -> DocumentChunk:
         section_id="Section 1",
         absolute_page=0,
     )
+
+
+def test_preflight_pipeline_deduplicates_duplicate_files(tmp_path: Path) -> None:
+    f1 = tmp_path / "f1.pdf"
+    f1.write_bytes(b"pdf content 1")
+    # f2 has the exact same content as f1
+    f2 = tmp_path / "f2.pdf"
+    f2.write_bytes(b"pdf content 1")
+    # f3 has different content
+    f3 = tmp_path / "f3.pdf"
+    f3.write_bytes(b"pdf content 2")
+
+    calls: list[str] = []
+    pipeline = _pipeline(calls)
+    pipeline.run([f1, f2, f3])
+
+    # Should only parse unique files (f1 and f3, f2 is skipped as duplicate)
+    parsed_files = [call for call in calls if call.startswith("parse:")]
+    assert len(parsed_files) == 2
+    assert f"parse:{f1}" in parsed_files
+    assert f"parse:{f3}" in parsed_files
+    assert f"parse:{f2}" not in parsed_files
+

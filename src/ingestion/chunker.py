@@ -70,9 +70,27 @@ class SectionAwareChunker:
         if current_group:
             chunk_groups.append(current_group)
 
+        # Merge-up pass: fold undersized trailing groups into the previous group
+        # when they share the same section and the merged result fits within max_tokens.
+        merged_groups: list[list[_Clause]] = []
+        for group in chunk_groups:
+            if (
+                merged_groups
+                and count_tokens(" ".join(c.text for c in group)) < self.min_tokens
+                and merged_groups[-1][0].section_id == group[0].section_id
+                and merged_groups[-1][0].absolute_page == group[0].absolute_page
+            ):
+                combined_tokens = count_tokens(
+                    " ".join(c.text for c in merged_groups[-1] + group)
+                )
+                if combined_tokens <= self.max_tokens:
+                    merged_groups[-1].extend(group)
+                    continue
+            merged_groups.append(group)
+
         return [
             self._build_chunk(document.document_name, chunk_index, group)
-            for chunk_index, group in enumerate(chunk_groups)
+            for chunk_index, group in enumerate(merged_groups)
         ]
 
     def _extract_clauses(self, document: ParsedDocument) -> list[_Clause]:

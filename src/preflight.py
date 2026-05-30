@@ -14,10 +14,16 @@ from src.common.exceptions import DocumentIngestionError, SearchEngineError
 from src.graphrag.graph_constructor import GraphConstructor
 from src.ingestion.chunker import SectionAwareChunker
 from src.ingestion.classifier import ClauseClassifier
-from src.ingestion.ingest import DocumentIngestor
+from src.ingestion.ingest import DocumentIngestor, compute_file_fingerprint
 from src.ingestion.schemas import DocumentChunk, ParsedDocument
 from src.search.indexer import ElasticsearchIndexer
+from typing import Protocol
 from src.search.schemas import IndexingOutcome
+
+
+class IndexerProtocol(Protocol):
+    def ensure_index(self) -> bool: ...
+    def index_chunks(self, chunks: Iterable[DocumentChunk]) -> IndexingOutcome: ...
 
 
 @dataclass(frozen=True)
@@ -41,7 +47,7 @@ class PreflightPipeline:
         chunker: SectionAwareChunker,
         classifier: ClauseClassifier,
         graph_constructor: GraphConstructor,
-        indexer: ElasticsearchIndexer,
+        indexer: IndexerProtocol,
         planner: PlannerAgent,
     ) -> None:
         self._ingestor = ingestor
@@ -58,11 +64,34 @@ class PreflightPipeline:
         if not paths:
             raise DocumentIngestionError("pre-flight requires at least one source document")
 
-        documents = [self._ingestor.parse(path) for path in paths]
+        # Deduplicate paths by calculating file fingerprint
+        import hashlib
+        seen_fingerprints = set()
+        unique_paths = []
+        for path in paths:
+            if Path(path).is_file():
+                fp = compute_file_fingerprint(path)
+            else:
+                fp = hashlib.sha256(str(path).encode()).hexdigest()
+            if fp not in seen_fingerprints:
+                seen_fingerprints.add(fp)
+                unique_paths.append(path)
+
+        documents = [self._ingestor.parse(path) for path in unique_paths]
+
+        from src.ingestion.defined_terms import DefinedTermsExtractor
+        extractor = DefinedTermsExtractor()
+
+        raw_chunks = []
+        for document in documents:
+            doc_definitions = extractor.extract_definitions(document)
+            doc_chunks = self._chunker.chunk(document)
+            mapped_chunks = extractor.map_defined_terms_to_chunks(doc_chunks, doc_definitions)
+            raw_chunks.extend(mapped_chunks)
+
         chunks = [
             self._classifier.classify_chunk(chunk)
-            for document in documents
-            for chunk in self._chunker.chunk(document)
+            for chunk in raw_chunks
         ]
         graph = self._graph_constructor.build_graph(chunks)
         self._indexer.ensure_index()
@@ -80,3 +109,4 @@ class PreflightPipeline:
             indexing=indexing,
             specialist_manifest=specialist_manifest,
         )
+

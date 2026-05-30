@@ -46,3 +46,4 @@ docker/volumes/
 htmlcov/
 .coverage
 coverage.xml
+*.txt

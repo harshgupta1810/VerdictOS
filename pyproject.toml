@@ -19,6 +19,7 @@ dependencies = [
     "fastapi>=0.110.0",
     "uvicorn>=0.28.0",
     "pydantic>=2.6.4",
+    "pydantic-settings>=2.2.0",
     "python-multipart>=0.0.9",
     "SQLAlchemy>=2.0.28",
     "asyncpg>=0.29.0",
@@ -47,3 +48,11 @@ python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[tool.pyright]
+include = ["src", "tests", "scripts"]
+venvPath = "."
+venv = ".venv"
+extraPaths = ["."]
+
+

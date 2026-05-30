@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import networkx as nx
 import pytest
@@ -136,6 +137,41 @@ def test_build_graph_merges_resolved_aliases_and_separates_unconfirmed_entities(
     assert unconfirmed["canonical_name"] == "Different Holdings"
 
 
+def test_build_graph_registers_unconfirmed_entity_so_later_aliases_resolve() -> None:
+    """Unconfirmed entities are registered as new canonicals so subsequent
+    spelling variants (aliases) can still resolve to them at tier 1/2."""
+    chunks = [
+        _chunk(chunk_id="agreement:0", text="first"),
+        _chunk(chunk_id="agreement:1", text="new_entity"),
+        _chunk(chunk_id="agreement:2", text="alias_of_new"),
+    ]
+    nlp = _MappedNLP(
+        {
+            "first": [_Entity("Acme Corp.", "ORG")],
+            # "Globex Holdings" cannot match "Acme Corp." — registered as new canonical
+            "new_entity": [_Entity("Globex Holdings", "ORG")],
+            # "Globex Holding" is a near-exact alias of "Globex Holdings" (ratio ~0.97 > 0.85)
+            "alias_of_new": [_Entity("Globex Holding", "ORG")],
+        }
+    )
+
+    graph = GraphConstructor(nlp=nlp).build_graph(chunks)
+
+    entity_nodes = [
+        attrs for _, attrs in graph.nodes(data=True) if attrs["node_type"] == "entity"
+    ]
+    # "Acme Corp." confirmed + "Globex Holdings"/"Globex Holding" merged into one node
+    assert len(entity_nodes) == 2
+    globex_node = next(
+        attrs for attrs in entity_nodes if "Globex" in attrs["canonical_name"]
+    )
+    # Both spellings merged under the same canonical
+    assert "Globex Holdings" in globex_node["aliases"]
+    assert "Globex Holding" in globex_node["aliases"]
+    # Status upgraded to confirmed once the alias resolved at tier 2
+    assert globex_node["status"] == "confirmed"
+
+
 @pytest.mark.parametrize(
     ("extension", "save_graph", "load_graph"),
     [
@@ -146,8 +182,8 @@ def test_build_graph_merges_resolved_aliases_and_separates_unconfirmed_entities(
 def test_graph_serialization_round_trip_preserves_attributes(
     tmp_path: Path,
     extension: str,
-    save_graph: object,
-    load_graph: object,
+    save_graph: Any,
+    load_graph: Any,
 ) -> None:
     graph = GraphConstructor(
         nlp=_MappedNLP({"source": [_Entity("Acme Corp.", "ORG"), _Entity("Ada Smith", "PERSON")]})
@@ -173,8 +209,8 @@ def test_graph_serialization_round_trip_preserves_attributes(
 def test_empty_graph_serialization_round_trip(
     tmp_path: Path,
     extension: str,
-    save_graph: object,
-    load_graph: object,
+    save_graph: Any,
+    load_graph: Any,
 ) -> None:
     output_path = tmp_path / f"empty.{extension}"
 

@@ -45,7 +45,7 @@ class GraphConstructor:
         nlp: Callable[[str], Any] | None = None,
         resolver: EntityResolver | None = None,
     ) -> None:
-        self._nlp = nlp or spacy.load("en_core_web_sm")
+        self._nlp = nlp or spacy.load("en_core_web_lg")
         self._resolver = resolver or EntityResolver()
 
     def extract_entities(self, chunks: Iterable[DocumentChunk]) -> list[ExtractedEntity]:
@@ -74,6 +74,7 @@ class GraphConstructor:
         """Build entity co-occurrence and explicit section-reference edges."""
 
         chunk_list = list(chunks)
+        bundle_context = {chunk.document_name for chunk in chunk_list}
         graph: nx.DiGraph[str] = nx.DiGraph()
         entities_by_chunk: dict[str, list[ExtractedEntity]] = {}
         for entity in self.extract_entities(chunk_list):
@@ -82,7 +83,7 @@ class GraphConstructor:
         for chunk in chunk_list:
             entity_node_ids: list[str] = []
             for entity in entities_by_chunk.get(chunk.chunk_id, []):
-                resolution = self._resolve_entity(entity)
+                resolution = self._resolve_entity(entity, bundle_context=bundle_context)
                 node_id = _entity_node_id(resolution)
                 _upsert_entity_node(graph, node_id, entity, resolution)
                 if node_id not in entity_node_ids:
@@ -120,9 +121,9 @@ class GraphConstructor:
                     )
         return graph
 
-    def _resolve_entity(self, entity: ExtractedEntity) -> EntityResolution:
+    def _resolve_entity(self, entity: ExtractedEntity, bundle_context: set[str] | None = None) -> EntityResolution:
         if not self._resolver.registered_entities(entity.entity_type):
-            self._resolver.register(entity.name, entity.entity_type)
+            self._resolver.register(entity.name, entity.entity_type, document_name=entity.document_name)
             return EntityResolution(
                 original_name=entity.name,
                 canonical_name=entity.name,
@@ -132,7 +133,12 @@ class GraphConstructor:
                 confidence=1.0,
                 reason="first_seen_canonical",
             )
-        return self._resolver.resolve(entity.name, entity.entity_type)
+        resolution = self._resolver.resolve(entity.name, entity.entity_type, bundle_context=bundle_context)
+        if resolution.status == "unconfirmed_node":
+            # Genuinely new entity — register it as a new canonical so subsequent
+            # aliases of this entity can resolve against it.
+            self._resolver.register(entity.name, entity.entity_type, document_name=entity.document_name)
+        return resolution
 
 
 def _entity_node_id(resolution: EntityResolution) -> str:
@@ -175,6 +181,9 @@ def _upsert_entity_node(
         attributes["aliases"].append(entity.name)
     if provenance not in attributes["provenance"]:
         attributes["provenance"].append(provenance)
+    # Upgrade status if a later resolution confirms the node.
+    if resolution.status == "confirmed" and attributes["status"] == "unconfirmed_node":
+        attributes["status"] = "confirmed"
 
 
 def _upsert_edge(
@@ -236,7 +245,7 @@ def save_graphml(graph: nx.DiGraph, output_path: str | Path) -> None:
 def load_graphml(input_path: str | Path) -> nx.DiGraph:
     """Load GraphML and restore encoded complex attributes."""
 
-    graph: nx.DiGraph[str] = nx.DiGraph(nx.read_graphml(Path(input_path)))
+    graph: nx.DiGraph = nx.DiGraph(nx.read_graphml(Path(input_path)))
     for _, attributes in graph.nodes(data=True):
         _decode_graphml_attributes(attributes)
     for _, _, attributes in graph.edges(data=True):

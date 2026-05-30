@@ -1,6 +1,8 @@
 """Tests for Elasticsearch indexing and search."""
 
 import pytest
+from pathlib import Path
+from typing import Any
 
 import src.search.client as client_module
 from src.common.exceptions import SearchEngineError
@@ -15,12 +17,12 @@ from src.search.search_engine import SparseSearchEngine, build_search_request
 class _Indices:
     def __init__(self, *, exists: bool = False) -> None:
         self._exists = exists
-        self.created: list[dict[str, object]] = []
+        self.created: list[dict[str, Any]] = []
 
     def exists(self, *, index: str) -> bool:
         return self._exists
 
-    def create(self, **kwargs: object) -> None:
+    def create(self, **kwargs: Any) -> None:
         self.created.append(kwargs)
 
 
@@ -30,11 +32,11 @@ class _Client:
 
 
 class _SearchClient:
-    def __init__(self, response: dict[str, object] | Exception) -> None:
+    def __init__(self, response: dict[str, Any] | Exception) -> None:
         self.response = response
-        self.requests: list[dict[str, object]] = []
+        self.requests: list[dict[str, Any]] = []
 
-    def search(self, **kwargs: object) -> dict[str, object]:
+    def search(self, **kwargs: Any) -> dict[str, Any]:
         self.requests.append(kwargs)
         if isinstance(self.response, Exception):
             raise self.response
@@ -61,11 +63,16 @@ def test_index_mapping_uses_canonical_clause_type_and_structural_fields() -> Non
         "properties": {
             "chunk_id": {"type": "keyword"},
             "document_name": {"type": "keyword"},
-            "text": {"type": "text"},
+            "text": {
+                "type": "text",
+                "analyzer": "synonym_analyzer",
+                "search_analyzer": "synonym_analyzer",
+            },
             "section_id": {"type": "keyword"},
             "absolute_page": {"type": "integer"},
             "clause_type": {"type": "keyword"},
             "references_sections": {"type": "keyword"},
+            "defined_terms": {"type": "object", "enabled": False},
         }
     }
 
@@ -76,12 +83,12 @@ def test_ensure_index_creates_missing_index_with_mapping() -> None:
     created = ElasticsearchIndexer(client, index_name="verdictos_documents").ensure_index()
 
     assert created is True
-    assert client.indices.created == [
-        {
-            "index": "verdictos_documents",
-            "mappings": DOCUMENT_INDEX_MAPPING,
-        }
-    ]
+    assert len(client.indices.created) == 1
+    created_index = client.indices.created[0]
+    assert created_index["index"] == "verdictos_documents"
+    assert created_index["mappings"] == DOCUMENT_INDEX_MAPPING
+    assert "settings" in created_index
+    assert "synonym_analyzer" in created_index["settings"]["index"]["analysis"]["analyzer"]
 
 
 def test_ensure_index_keeps_existing_index() -> None:
@@ -94,9 +101,9 @@ def test_ensure_index_keeps_existing_index() -> None:
 
 
 def test_index_chunks_uses_deterministic_ids_for_incremental_upserts() -> None:
-    captured_actions: list[dict[str, object]] = []
+    captured_actions: list[dict[str, Any]] = []
 
-    def bulk_writer(_client: object, actions: list[dict[str, object]], **_kwargs: object) -> tuple[int, list[dict]]:
+    def bulk_writer(_client: object, actions: list[dict[str, Any]], **_kwargs: Any) -> tuple[int, list[dict[str, Any]]]:
         captured_actions.extend(actions)
         return len(actions), []
 
@@ -117,9 +124,9 @@ def test_index_chunks_uses_deterministic_ids_for_incremental_upserts() -> None:
 
 
 def test_index_chunks_adds_supplemental_documents_without_rebuild() -> None:
-    captured_actions: list[dict[str, object]] = []
+    captured_actions: list[dict[str, Any]] = []
 
-    def bulk_writer(_client: object, actions: list[dict[str, object]], **_kwargs: object) -> tuple[int, list[dict]]:
+    def bulk_writer(_client: object, actions: list[dict[str, Any]], **_kwargs: Any) -> tuple[int, list[dict[str, Any]]]:
         captured_actions.extend(actions)
         return len(actions), []
 
@@ -241,3 +248,63 @@ def _chunk(
         clause_type=ClauseType.LIABILITY_CAP,
         references_sections=["Section 9.4"],
     )
+
+
+def test_search_resolves_section_references() -> None:
+    # A search client that returns hits matching Section 9.4
+    client = _SearchClient(
+        {
+            "hits": {
+                "hits": [
+                    {
+                        "_score": 1.0,
+                        "_source": {
+                            "chunk_id": "agreement:12",
+                            "document_name": "agreement.pdf",
+                            "text": "This is Section 9.4 about liability cap.",
+                            "section_id": "Section 9.4",
+                            "absolute_page": 4,
+                            "clause_type": "liability_cap",
+                            "references_sections": [],
+                            "defined_terms": {},
+                        },
+                    }
+                ]
+            }
+        }
+    )
+
+    results = SparseSearchEngine(client, index_name="verdictos_documents").search(
+        SearchQuery(text="Find Section 9.4 in this deal")
+    )
+
+    assert len(results) == 1
+    assert results[0].section_id == "Section 9.4"
+    assert results[0].chunk_id == "agreement:12"
+    # Verify that it performed a term query filter on section_id rather than a match query
+    sent_request = client.requests[0]
+    assert sent_request["index"] == "verdictos_documents"
+    filters = sent_request["query"]["bool"]["filter"]
+    assert {"term": {"section_id": "Section 9.4"}} in filters
+
+
+def test_index_persistence_caching(tmp_path: Path) -> None:
+    cache_file = tmp_path / "cache.json"
+
+    indexer = ElasticsearchIndexer(_Client(), index_name="verdictos_documents")
+
+    chunk1 = _chunk(chunk_id="chunk:1", text="some text 1")
+    chunk2 = _chunk(chunk_id="chunk:2", text="some text 2")
+
+    # Save cache
+    indexer.save_index_cache([chunk1, chunk2], filepath=str(cache_file))
+
+    # Load cache
+    loaded = indexer.load_index_cache(filepath=str(cache_file))
+
+    assert len(loaded) == 2
+    assert loaded[0].chunk_id == "chunk:1"
+    assert loaded[0].text == "some text 1"
+    assert loaded[1].chunk_id == "chunk:2"
+
+

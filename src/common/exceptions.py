@@ -19,3 +19,11 @@ class UnsupportedDocumentTypeError(DocumentIngestionError):
 
 class SearchEngineError(VerdictOSError):
     """Raised when sparse retrieval fails."""
+
+
+class LLMClientError(VerdictOSError):
+    """Raised when the local LLM service is unreachable or times out."""
+
+
+class SchemaRetryExhaustedError(VerdictOSError):
+    """Raised when the Pydantic auto-retry middleware exhausts all retries."""

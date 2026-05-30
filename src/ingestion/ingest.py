@@ -6,6 +6,7 @@ mappings, and determines section boundaries.
 Technologies: pdfplumber, python-docx
 """
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -21,6 +22,16 @@ from docx.text.paragraph import Paragraph
 
 from src.common.exceptions import DocumentIngestionError, UnsupportedDocumentTypeError
 from src.ingestion.schemas import LayoutElement, ParsedDocument, ParsedPage
+
+
+def compute_file_fingerprint(path: Path | str) -> str:
+    """Compute deterministic SHA-256 fingerprint of a file."""
+    hasher = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
 
 _LINE_TOLERANCE = 3.0
 _LINE_WORD_GAP_TOLERANCE = 96.0
@@ -214,7 +225,7 @@ def _extract_docx_pages(document: DocxDocument) -> list[ParsedPage]:
     for block in _iter_docx_blocks(document):
         if isinstance(block, Paragraph):
             kind: Literal["heading", "paragraph"] = (
-                "heading" if block.style and block.style.name.casefold().startswith("heading") else "paragraph"
+                "heading" if block.style and block.style.name and block.style.name.casefold().startswith("heading") else "paragraph"
             )
             fragments = _split_paragraph_on_page_breaks(block)
             for fragment_index, fragment in enumerate(fragments):

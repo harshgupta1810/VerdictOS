@@ -17,6 +17,14 @@ def test_clause_type_contains_locked_taxonomy_values() -> None:
         "change_of_control",
         "indemnification",
         "data_protection",
+        "insurance_policy",
+        "governance_clause",
+        "related_party_transaction",
+        "cyber_security",
+        "supplier_contract",
+        "customer_contract",
+        "reputation_risk",
+        "esg_obligation",
         "general",
     ]
 

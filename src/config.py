@@ -1,27 +1,49 @@
-import os
+import logging
 
-from pydantic import BaseModel
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+_INSECURE_DEFAULT = "INSECURE-CHANGE-IN-PRODUCTION"
 
 
-class Settings(BaseModel):
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     # Elasticsearch
-    elasticsearch_url: str = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
-    elasticsearch_index: str = os.getenv("ELASTICSEARCH_INDEX", "verdictos_documents")
+    elasticsearch_url: str = Field(default="http://localhost:9200")
+    elasticsearch_index: str = Field(default="verdictos_documents")
 
     # Local LLMs
-    ollama_url: str = os.getenv("OLLAMA_URL", "http://localhost:11434")
-    llm_reasoning_model: str = os.getenv("LLM_REASONING_MODEL", "llama3")
-    llm_disambiguation_model: str = os.getenv("LLM_DISAMBIGUATION_MODEL", "qwen2.5")
+    ollama_url: str = Field(default="http://localhost:11434")
+    llm_reasoning_model: str = Field(default="llama3")
+    llm_disambiguation_model: str = Field(default="qwen2.5")
 
     # Redis (Queue and Cache)
-    redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    redis_url: str = Field(default="redis://localhost:6379/0")
 
     # Database
-    database_url: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./verdictos.db")
+    database_url: str = Field(default="sqlite+aiosqlite:///./verdictos.db")
 
     # Gateway / JWT Security
-    jwt_secret: str = os.getenv("JWT_SECRET", "super-secret-key-change-in-production")
-    jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
-    access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+    jwt_secret: str = Field(default=_INSECURE_DEFAULT)
+    jwt_algorithm: str = Field(default="HS256")
+    access_token_expire_minutes: int = Field(default=1440, ge=1)
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def warn_if_insecure_jwt_secret(cls, value: str) -> str:
+        if value == _INSECURE_DEFAULT:
+            logger.warning(
+                "JWT_SECRET is set to the insecure default. "
+                "Set JWT_SECRET via environment variable or .env file before deploying."
+            )
+        return value
+
 
 settings = Settings()

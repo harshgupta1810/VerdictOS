@@ -1,6 +1,7 @@
 """Tests for 3-tier entity resolution engine."""
 
 import pytest
+from typing import Any
 
 import src.graphrag.entity_resolver as resolver_module
 from src.graphrag.entity_resolver import EntityResolver, normalize_entity_name
@@ -111,7 +112,7 @@ def test_tier_two_preserves_ambiguous_tied_matches(monkeypatch: pytest.MonkeyPat
 def test_tier_three_accepts_strict_json_merge_for_registered_canonical_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(resolver_module, "_similarity_ratio", lambda _left, _right: 0.5)
+    monkeypatch.setattr(resolver_module, "_similarity_ratio", lambda _left, _right: 0.70)
     resolver = EntityResolver(
         llm_client=_LLMClient(
             '{"merge":true,"canonical_name":"Acme Corp.","confidence":0.91,"reason":"Known alias"}'
@@ -147,7 +148,7 @@ def test_tier_three_preserves_unconfirmed_node_for_rejected_or_invalid_results(
     response: str | dict[str, object] | Exception,
     reason: str,
 ) -> None:
-    monkeypatch.setattr(resolver_module, "_similarity_ratio", lambda _left, _right: 0.5)
+    monkeypatch.setattr(resolver_module, "_similarity_ratio", lambda _left, _right: 0.70)
     resolver = EntityResolver(llm_client=_LLMClient(response))
     resolver.register("Acme Corp.", "organization")
 
@@ -157,3 +158,63 @@ def test_tier_three_preserves_unconfirmed_node_for_rejected_or_invalid_results(
     assert resolution.resolution_tier is None
     assert resolution.status == "unconfirmed_node"
     assert resolution.reason == reason
+
+
+def test_tier_1_person_initials_matching() -> None:
+    resolver = EntityResolver()
+    resolver.register("John Smith", "person")
+
+    # J. Smith should resolve to John Smith at Tier 1
+    res1 = resolver.resolve("J. Smith", "person")
+    assert res1.canonical_name == "John Smith"
+    assert res1.resolution_tier == 1
+
+    # Smith, J. should resolve to John Smith at Tier 1
+    res2 = resolver.resolve("Smith, J.", "person")
+    assert res2.canonical_name == "John Smith"
+    assert res2.resolution_tier == 1
+
+
+def test_tier_1_role_stripping() -> None:
+    resolver = EntityResolver()
+    resolver.register("John Smith", "person")
+
+    # "CEO John Smith" should resolve to "John Smith" at Tier 1 after role stripping
+    res = resolver.resolve("CEO John Smith", "person")
+    assert res.canonical_name == "John Smith"
+    assert res.resolution_tier == 1
+
+
+def test_tier_2_bundle_context() -> None:
+    resolver = EntityResolver()
+    # Register Acme Corporation in doc1.pdf
+    resolver.register("Acme Corporation", "organization", document_name="doc1.pdf")
+
+    # Resolve "Acme Corporatio" in same bundle context (doc1.pdf)
+    # The similarity score will be boosted, ensuring resolution
+    res = resolver.resolve(
+        "Acme Corporatio",
+        "organization",
+        bundle_context=["doc1.pdf"]
+    )
+    assert res.canonical_name == "Acme Corporation"
+    assert res.resolution_tier == 2
+
+
+def test_tier_3_gating(monkeypatch: pytest.MonkeyPatch) -> None:
+    # If the similarity is too low (e.g. 0.50), LLM should NOT be called, returning unconfirmed
+    monkeypatch.setattr(resolver_module, "_similarity_ratio", lambda _left, _right: 0.50)
+    llm_calls = []
+
+    class TrackedLLM:
+        def disambiguate(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+            llm_calls.append(kwargs)
+            return {"merge": False}
+
+    resolver = EntityResolver(llm_client=TrackedLLM())
+    resolver.register("Acme Corp.", "organization")
+
+    res = resolver.resolve("Acme Holdings", "organization")
+    assert res.status == "unconfirmed_node"
+    assert len(llm_calls) == 0  # Gated out since score is 0.50
+
