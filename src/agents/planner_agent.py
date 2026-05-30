@@ -31,7 +31,7 @@ CORRECT_AGENT_IDS = [
     "esg_agent",
 ]
 
-SPECIALIST_REGISTRY = [
+_BASE_REGISTRY = [
     SpecialistDefinition(
         agent_name=AgentName.IP,
         routing_terms=[
@@ -218,7 +218,7 @@ AGENT_SYNONYMS: dict[AgentName, dict[str, list[str]]] = {
 
 SPECIALIST_REGISTRY = [
     specialist.model_copy(update={"synonym_groups": AGENT_SYNONYMS[specialist.agent_name]})
-    for specialist in SPECIALIST_REGISTRY
+    for specialist in _BASE_REGISTRY
 ]
 _SPECIALISTS_BY_NAME = {specialist.agent_name: specialist for specialist in SPECIALIST_REGISTRY}
 

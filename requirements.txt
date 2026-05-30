@@ -19,6 +19,7 @@ python-multipart>=0.0.9
 # Databases and Storage
 SQLAlchemy>=2.0.28
 asyncpg>=0.29.0
+aiosqlite>=0.20.0
 redis>=5.0.3
 
 # Agent Orchestration and Queues
