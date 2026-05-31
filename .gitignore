@@ -47,3 +47,4 @@ htmlcov/
 .coverage
 coverage.xml
 *.txt
+/flowsetup

@@ -2,8 +2,9 @@
 
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.common.models import ClauseType
 
@@ -69,11 +70,14 @@ class Severity(str, Enum):  # noqa: UP042 - consumed as string by downstream ser
 class FindingDimension(str, Enum):  # noqa: UP042 - consumed as string by downstream serializers.
     """Top-level M&A due diligence workstream used to group findings."""
 
-    LEGAL = "legal"
-    FINANCIAL = "financial"
-    PEOPLE = "people"
-    OPERATIONAL = "operational"
-    STRATEGIC = "strategic"
+    RISK_EXPOSURE = "risk_exposure"
+    VALUATION_FAIRNESS = "valuation_fairness"
+    STRATEGIC_FIT = "strategic_fit"
+    SYNERGY_VALIDITY = "synergy_validity"
+    INTEGRATION_COMPLEXITY = "integration_complexity"
+    MARKET_TIMING = "market_timing"
+    REGULATORY_APPROVAL = "regulatory_approval"
+    EXIT_SCENARIO = "exit_scenario"
 
 
 # ---------------------------------------------------------------------------
@@ -147,6 +151,73 @@ def assign_severity(confidence: float, clause_type: ClauseType, claim: str) -> S
     return base
 
 
+_CONF_LEVELS = {
+    "high": 3,
+    "medium": 2,
+    "speculative": 1
+}
+
+class Confidence(str, Enum):  # noqa: UP042 - keep string enum mapping clean.
+    """Categorical confidence levels used for judge and debate gating."""
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    SPECULATIVE = "speculative"
+
+    def __lt__(self, other: Any) -> bool:
+        if isinstance(other, (int, float)):
+            self_val = 0.9 if self == Confidence.HIGH else (0.5 if self == Confidence.MEDIUM else 0.1)
+            return self_val < other
+        self_str = str(self.value) if hasattr(self, "value") else str(self)
+        other_str = str(other.value) if hasattr(other, "value") else str(other)
+        if self_str in _CONF_LEVELS and other_str in _CONF_LEVELS:
+            return _CONF_LEVELS[self_str] < _CONF_LEVELS[other_str]
+        return super().__lt__(other)
+
+    def __le__(self, other: Any) -> bool:
+        if isinstance(other, (int, float)):
+            self_val = 0.9 if self == Confidence.HIGH else (0.5 if self == Confidence.MEDIUM else 0.1)
+            return self_val <= other
+        self_str = str(self.value) if hasattr(self, "value") else str(self)
+        other_str = str(other.value) if hasattr(other, "value") else str(other)
+        if self_str in _CONF_LEVELS and other_str in _CONF_LEVELS:
+            return _CONF_LEVELS[self_str] <= _CONF_LEVELS[other_str]
+        return super().__le__(other)
+
+    def __gt__(self, other: Any) -> bool:
+        if isinstance(other, (int, float)):
+            self_val = 0.9 if self == Confidence.HIGH else (0.5 if self == Confidence.MEDIUM else 0.1)
+            return self_val > other
+        self_str = str(self.value) if hasattr(self, "value") else str(self)
+        other_str = str(other.value) if hasattr(other, "value") else str(other)
+        if self_str in _CONF_LEVELS and other_str in _CONF_LEVELS:
+            return _CONF_LEVELS[self_str] > _CONF_LEVELS[other_str]
+        return super().__gt__(other)
+
+    def __ge__(self, other: Any) -> bool:
+        if isinstance(other, (int, float)):
+            self_val = 0.9 if self == Confidence.HIGH else (0.5 if self == Confidence.MEDIUM else 0.1)
+            return self_val >= other
+        self_str = str(self.value) if hasattr(self, "value") else str(self)
+        other_str = str(other.value) if hasattr(other, "value") else str(other)
+        if self_str in _CONF_LEVELS and other_str in _CONF_LEVELS:
+            return _CONF_LEVELS[self_str] >= _CONF_LEVELS[other_str]
+        return super().__ge__(other)
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, (int, float)):
+            if other >= 0.8:
+                return self == Confidence.HIGH
+            elif other >= 0.5:
+                return self == Confidence.MEDIUM
+            else:
+                return self == Confidence.SPECULATIVE
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash(str(self.value) if hasattr(self, "value") else str(self))
+
+
 class Finding(BaseModel):
     """Structured finding produced by a specialist agent.
 
@@ -163,8 +234,8 @@ class Finding(BaseModel):
     source_agent: AgentName
     section_id: str = Field(min_length=1)
     absolute_page: int = Field(ge=0)
-    confidence: float = Field(ge=0.0, le=1.0)
-    dimension: FindingDimension = FindingDimension.LEGAL
+    confidence: Confidence = Confidence.MEDIUM
+    dimension: FindingDimension = FindingDimension.RISK_EXPOSURE
     domain: str = ""
     severity: Severity = Severity.MEDIUM
     clause_type: ClauseType = ClauseType.GENERAL
@@ -173,6 +244,22 @@ class Finding(BaseModel):
     notes: str = ""
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     relevant: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def convert_confidence(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "confidence" in data:
+            conf = data["confidence"]
+            if isinstance(conf, (int, float)):
+                if not (0.0 <= conf <= 1.0):
+                    raise ValueError("confidence must be between 0.0 and 1.0")
+                if conf >= 0.8:
+                    data["confidence"] = "high"
+                elif conf >= 0.5:
+                    data["confidence"] = "medium"
+                else:
+                    data["confidence"] = "speculative"
+        return data
 
 
 class AgentAnalysisResult(BaseModel):

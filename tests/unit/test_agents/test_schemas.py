@@ -32,7 +32,7 @@ def _valid_finding(**overrides: Any) -> dict[str, Any]:
         "section_id": "Section 4.2",
         "absolute_page": 12,
         "confidence": 0.85,
-        "dimension": FindingDimension.LEGAL,
+        "dimension": FindingDimension.RISK_EXPOSURE,
         "domain": "intellectual_property",
         "severity": Severity.CRITICAL,
         "clause_type": ClauseType.IP_ASSIGNMENT,
@@ -132,8 +132,8 @@ class TestFinding:
         assert f.severity == Severity.HIGH
 
     def test_dimension_field(self) -> None:
-        f = Finding(**_valid_finding(dimension=FindingDimension.FINANCIAL))
-        assert f.dimension == FindingDimension.FINANCIAL
+        f = Finding(**_valid_finding(dimension=FindingDimension.VALUATION_FAIRNESS))
+        assert f.dimension == FindingDimension.VALUATION_FAIRNESS
 
     def test_domain_field(self) -> None:
         f = Finding(**_valid_finding(domain="litigation"))

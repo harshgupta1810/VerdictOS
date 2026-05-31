@@ -106,7 +106,7 @@ def _make_finding(
         section_id=section_id,
         absolute_page=0,
         confidence=confidence,
-        dimension=FindingDimension.LEGAL,
+        dimension=FindingDimension.RISK_EXPOSURE,
         domain="intellectual_property",
         severity=Severity.HIGH,
         clause_type=ClauseType.IP_ASSIGNMENT,
