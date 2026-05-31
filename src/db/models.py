@@ -70,6 +70,7 @@ class DebateArg(Base):
     )
     round_number: Mapped[int] = mapped_column(Integer, nullable=False)
     persona_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    dimension: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     stance: Mapped[str] = mapped_column(String(50), nullable=False)
     steelman: Mapped[str] = mapped_column(Text, nullable=False)
     argument: Mapped[str] = mapped_column(Text, nullable=False)
@@ -77,7 +78,25 @@ class DebateArg(Base):
     calibrated_confidence: Mapped[str] = mapped_column(String(50), nullable=False)
     contradiction_flag: Mapped[bool] = mapped_column(Boolean, default=False)
     bm25_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    dropout_flag: Mapped[bool] = mapped_column(Boolean, default=False)
     raw_payload: Mapped[Any] = mapped_column(JSON, nullable=True)
+
+
+class DimensionStateRecord(Base):
+    """Persists per-dimension debate state between rounds."""
+
+    __tablename__ = "dimension_states"
+
+    record_id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    deal_id: Mapped[str] = mapped_column(ForeignKey("deals.deal_id"), nullable=False)
+    dimension: Mapped[str] = mapped_column(String(200), nullable=False)
+    state: Mapped[str] = mapped_column(String(50), nullable=False, default="active")
+    round_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    findings_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # pyrefly: ignore [deprecated]
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class AuditRecord(Base):

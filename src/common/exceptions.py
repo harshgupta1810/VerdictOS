@@ -27,3 +27,16 @@ class LLMClientError(VerdictOSError):
 
 class SchemaRetryExhaustedError(VerdictOSError):
     """Raised when the Pydantic auto-retry middleware exhausts all retries."""
+
+
+class DebateEngineError(VerdictOSError):
+    """Raised when the adversarial debate engine encounters a fatal error."""
+
+
+class GateValidationError(VerdictOSError):
+    """Raised when a reliability gate (B–E) rejects a debate argument."""
+
+
+class PersonaDropoutError(VerdictOSError):
+    """Raised when a persona fails to produce valid output after retries."""
+

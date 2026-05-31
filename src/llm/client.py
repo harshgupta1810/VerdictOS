@@ -8,6 +8,7 @@ Supported models: Llama-3, Qwen-2.5, Mistral.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -17,6 +18,7 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from src.common.exceptions import LLMClientError, SchemaRetryExhaustedError
+from src.common.retry import with_exponential_backoff
 from src.llm.schemas import LLMRequest, LLMResponse
 
 try:
@@ -27,6 +29,8 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
+
+_llm_semaphore = asyncio.Semaphore(40)
 
 _REPAIR_SYSTEM_PROMPT = (
     "Your previous JSON output failed validation with the following error:\n"
@@ -83,53 +87,54 @@ class OllamaClient:
     def default_model(self) -> str:
         return self._default_model
 
+    @with_exponential_backoff()
     async def generate(self, request: LLMRequest) -> LLMResponse:
         """POST to Ollama /api/generate with JSON format enforcement."""
+        async with _llm_semaphore:
+            payload: dict[str, Any] = {
+                "model": request.model or self._default_model,
+                "prompt": request.user_prompt,
+                "format": request.format,
+                "stream": False,
+            }
+            if request.system_prompt:
+                payload["system"] = request.system_prompt
+            if request.temperature is not None:
+                payload["options"] = {"temperature": request.temperature}
+            if request.max_tokens is not None:
+                payload.setdefault("options", {})["num_predict"] = request.max_tokens
 
-        payload: dict[str, Any] = {
-            "model": request.model or self._default_model,
-            "prompt": request.user_prompt,
-            "format": request.format,
-            "stream": False,
-        }
-        if request.system_prompt:
-            payload["system"] = request.system_prompt
-        if request.temperature is not None:
-            payload["options"] = {"temperature": request.temperature}
-        if request.max_tokens is not None:
-            payload.setdefault("options", {})["num_predict"] = request.max_tokens
+            start_ms = _now_ms()
+            try:
+                async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+                    resp = await client.post(
+                        f"{self._base_url}/api/generate",
+                        json=payload,
+                    )
+                    resp.raise_for_status()
+            except httpx.TimeoutException as exc:
+                raise LLMClientError(
+                    f"Ollama request timed out after {self._timeout_seconds}s"
+                ) from exc
+            except httpx.HTTPError as exc:
+                raise LLMClientError(f"Ollama HTTP error: {exc}") from exc
 
-        start_ms = _now_ms()
-        try:
-            async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
-                resp = await client.post(
-                    f"{self._base_url}/api/generate",
-                    json=payload,
-                )
-                resp.raise_for_status()
-        except httpx.TimeoutException as exc:
-            raise LLMClientError(
-                f"Ollama request timed out after {self._timeout_seconds}s"
-            ) from exc
-        except httpx.HTTPError as exc:
-            raise LLMClientError(f"Ollama HTTP error: {exc}") from exc
+            elapsed = _now_ms() - start_ms
+            body = resp.json()
+            raw_text = body.get("response", "")
 
-        elapsed = _now_ms() - start_ms
-        body = resp.json()
-        raw_text = body.get("response", "")
+            parsed_json: dict[str, Any] | None = None
+            try:
+                parsed_json = json.loads(raw_text)
+            except (json.JSONDecodeError, TypeError):
+                pass
 
-        parsed_json: dict[str, Any] | None = None
-        try:
-            parsed_json = json.loads(raw_text)
-        except (json.JSONDecodeError, TypeError):
-            pass
-
-        return LLMResponse(
-            model=body.get("model", request.model),
-            raw_text=raw_text,
-            parsed_json=parsed_json,
-            duration_ms=elapsed,
-        )
+            return LLMResponse(
+                model=body.get("model", request.model),
+                raw_text=raw_text,
+                parsed_json=parsed_json,
+                duration_ms=elapsed,
+            )
 
     async def generate_with_schema(
         self,
