@@ -25,7 +25,13 @@ Phase 5: Consensus Mapping (Sync Math)
 Phase 6: Judge Synthesis (Async LLM)
            │
            ▼
-Phase 7: Verdict & Human Loop (FastAPI API)
+Phase 7: Verdict & Delta Engine (FastAPI API + Incremental Re-analysis)
+           │
+           ▼
+Phase 8: Advanced Escalation & Approval Workflow
+           │
+           ▼
+Final Output: Structured Verdict & Audit Trail
 ```
 
 ### Phase 1: Ingestion & Structural Indexing (Pre-Flight)
@@ -58,10 +64,15 @@ Phase 7: Verdict & Human Loop (FastAPI API)
 - **Key Modules:** `src/debate/personas.py`.
 - **Developer Action:** Run mock inputs through the Judge prompts.
 
-### Phase 7: Structured Verdict & Human Loop Integration
-- **Description:** Generates the final Go/No-Go Brief, Human Escalation List, and Evidence Gap Report. Open escalation items are routed to the FastAPI escalation queue (with a 4-hour SLA alert). User disputes trigger a delta index re-run.
-- **Key Modules:** `src/api/main.py`, `src/db/models.py`.
-- **Developer Action:** Query FastAPI endpoints and verify DB append-only triggers.
+### Phase 7: Structured Verdict & Delta Engine
+- **Description:** Generates the final Go/No-Go Brief, Human Escalation List, and Evidence Gap Report. Enables delta reanalysis for document supplements without full reprocessing. User disputes trigger selective re-indexing and re-analysis of affected specialists.
+- **Key Modules:** `src/api/main.py`, `src/hitl/delta_engine.py`, `src/db/models.py`.
+- **Developer Action:** Query FastAPI endpoints and verify delta tracking logic.
+
+### Phase 8: Advanced Escalation & Approval Workflow
+- **Description:** Provides multi-level escalation routing for findings requiring human judgment. Implements approval chains with priority management, SLA tracking (4-hour alert), and immutable audit trails. Escalations can be resolved with human decisions, triggering delta re-analysis or verdict updates. Disputes are logged additively without destroying original AI reasoning.
+- **Key Modules:** `src/hitl/escalation.py`, `src/hitl/dispute.py`, `src/hitl/audit.py`, `src/api/routes/escalations.py`.
+- **Developer Action:** Verify escalation workflow APIs, approval chain state transitions, and append-only audit enforcement.
 
 ---
 

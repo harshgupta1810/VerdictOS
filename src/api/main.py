@@ -22,6 +22,9 @@ from src.common.exceptions import (
 )
 from src.common.logging import configure_logging
 from src.api.schemas.responses import ErrorResponse, HealthResponse
+from fastapi.middleware.cors import CORSMiddleware
+from src.api.middleware.auth import APIKeyMiddleware
+from src.api.routes import deals, escalations
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +70,26 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    # -----------------------------------------------------------------------
+    # Middleware
+    # -----------------------------------------------------------------------
+    
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    application.add_middleware(APIKeyMiddleware)
+
+    # -----------------------------------------------------------------------
+    # Routers
+    # -----------------------------------------------------------------------
+    
+    application.include_router(deals.router, prefix="/api/v1")
+    application.include_router(escalations.router, prefix="/api/v1")
 
     # -----------------------------------------------------------------------
     # Global exception handlers

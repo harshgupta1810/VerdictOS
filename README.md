@@ -61,6 +61,75 @@ Confidential legal documents cannot egress to cloud APIs. VerdictOS runs exclusi
 | **Phase 5** | REST API & FastAPI Gateway | ✅ Complete | Deal submission, status streaming, verdict retrieval, audit log access |
 | **Phase 6** | Human-in-the-Loop System | ✅ Complete | Escalation management, dispute resolution, audit trail logging |
 | **Phase 7** | Delta Engine & Incremental Re-analysis | ✅ Complete | Document delta tracking, selective re-indexing, finding merging, supplementary verdict updates |
+| **Phase 8** | Advanced Escalation & Approval Workflow | ✅ Complete | Multi-level escalation routing, priority management, approval chains, SLA tracking, human judgment integration |
+
+### Phase Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                   │
+│  Phase 1: Ingest & Index (Synchronous Pre-Flight)               │
+│  ├─ PDF/DOCX parsing, section-aware chunking                    │
+│  ├─ Clause classification (16 types)                            │
+│  ├─ Entity resolution (3-tier: exact → fuzzy → LLM)             │
+│  ├─ GraphRAG knowledge graph construction                        │
+│  └─ Elasticsearch BM25 indexing                                 │
+│                          │                                       │
+│                          ▼                                       │
+│  Phase 2: Smart Dispatch & Specialist Analysis (Async)          │
+│  ├─ Planner Agent activates domain specialists                  │
+│  ├─ Specialist agents query indexed documents                   │
+│  ├─ Parallel task execution via Celery + Redis                  │
+│  └─ Finding aggregation by 8 strategic dimensions               │
+│                          │                                       │
+│                          ▼                                       │
+│  Phase 3: Dimension Gating & Findings Aggregation (Async)       │
+│  ├─ Group findings by 8 strategic dimensions                    │
+│  ├─ Apply gating filter (skip debate if < 3 findings)           │
+│  └─ Route sparse findings to evidence gaps                      │
+│                          │                                       │
+│                          ▼                                       │
+│  Phase 4: Adversarial Debate Engine (Async)                     │
+│  ├─ 6 debate personas (Skeptic, Extremist, Pragmatist, etc.)    │
+│  ├─ 8 strategic tracks with validation gates                    │
+│  ├─ 3-round maximum with early-exit on consensus               │
+│  └─ Steelman rule enforcement via Pydantic validation           │
+│                          │                                       │
+│                          ▼                                       │
+│  Phase 5: Consensus Mapping (Deterministic Math)                │
+│  ├─ Aggregate persona stances (majority-rule counting)          │
+│  ├─ Sort findings: Settled, Contested, Unresolved               │
+│  └─ Filter for Judge Agent processing                           │
+│                          │                                       │
+│                          ▼                                       │
+│  Phase 6: Judge Synthesis (Async LLM)                           │
+│  ├─ Judge Agent processes Contested/Unresolved                  │
+│  ├─ Generate final verdict with confidence scoring              │
+│  └─ Create Go/No-Go Brief & Evidence Gap Report                 │
+│                          │                                       │
+│                          ▼                                       │
+│  Phase 7: Delta Engine & Incremental Re-analysis                │
+│  ├─ Track document deltas on supplementary uploads              │
+│  ├─ Selective re-indexing (only new/modified chunks)            │
+│  ├─ Re-run affected specialists                                 │
+│  └─ Merge supplementary findings into existing verdict          │
+│                          │                                       │
+│                          ▼                                       │
+│  Phase 8: Advanced Escalation & Approval Workflow               │
+│  ├─ Multi-level escalation routing                              │
+│  ├─ Human escalation & dispute management                       │
+│  ├─ Approval chain workflows with SLA tracking                  │
+│  ├─ Immutable audit trails for all decisions                    │
+│  └─ Delta re-analysis on user disputes                          │
+│                          │                                       │
+│                          ▼                                       │
+│  FastAPI REST Gateway & Verdict Output                          │
+│  ├─ WebSocket status streaming                                  │
+│  ├─ Structured verdict retrieval                                │
+│  └─ Audit log access & compliance reporting                     │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
