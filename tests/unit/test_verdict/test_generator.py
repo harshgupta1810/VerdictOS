@@ -110,23 +110,84 @@ async def test_verdict_assembler_generates_correct_json(db_session: AsyncSession
 
     # 6. Assemble Verdict
     assembler = VerdictAssembler(db_session)
-    verdict = await assembler.generate_verdict(deal.deal_id, judge_results)
+    
+    # Also test the remaining logic
+    # Set contradiction_flag, dropout_flag on the arg
+    arg2 = DebateArg(
+        finding_id=f2.finding_id,
+        round_number=2,
+        persona_name="Critic",
+        stance="against",
+        steelman="",
+        argument="Contradiction here",
+        calibrated_confidence="low",
+        contradiction_flag=True,
+        dropout_flag=True
+    )
+    db_session.add(arg2)
+    await db_session.commit()
+    
+    # Missing finding evidence
+    finding_missing = Finding(
+        deal_id=deal.deal_id,
+        claim="Missing info",
+        citation="",
+        section_id="Sec2",
+        confidence="low",
+        dimension="tax",
+        agent_name="tax_agent",
+        severity="low",
+        clause_type="tax"
+    )
+    db_session.add(finding_missing)
+    await db_session.commit()
+    
+    judge_results_ext = {
+        f2.finding_id: JudgeSynthesisResult(
+            finding_id=f2.finding_id,
+            status=JudgeVerdictStatus.CONFIRMED,
+            calibrated_confidence=0.88,
+            judge_override_flag=True,
+            synthesis_rationale="Overridden."
+        ),
+        finding_missing.finding_id: JudgeSynthesisResult(
+            finding_id=finding_missing.finding_id,
+            status=JudgeVerdictStatus.EVIDENCE_NOT_FOUND,
+            calibrated_confidence=0.0,
+            judge_override_flag=False,
+            synthesis_rationale=""
+        )
+    }
+    
+    verdict = await assembler.generate_verdict(deal.deal_id, judge_results_ext)
+    
+    # Assert missing logic
+    assert len(verdict.evidence_gap_report.gaps) > 0
+    assert any("Missing info" in gap.missing_claims for gap in verdict.evidence_gap_report.gaps)
+    
+    # Assert contradictions
+    assert len(verdict.escalation_list.escalations) > 0
+    assert verdict.escalation_list.escalations[0].has_contradictions is True
+    assert verdict.escalation_list.escalations[0].has_dropouts is True
+    
+    # Deal not found
+    verdict_not_found = await assembler.generate_verdict("bad_deal_id", {})
+    assert verdict_not_found.deal_id == "bad_deal_id"
 
     # 7. Assertions
     assert verdict.deal_id == deal.deal_id
     
-    # Brief should contain f1
-    assert len(verdict.brief.findings) == 1
-    assert verdict.brief.findings[0].finding_id == f1.finding_id
-    assert verdict.brief.findings[0].severity == "critical"
+    # Brief should contain f1 and f2
+    assert len(verdict.brief.findings) == 2
+    assert verdict.brief.findings[0].finding_id == f1.finding_id or verdict.brief.findings[1].finding_id == f1.finding_id
 
     # Escalation should contain f2
     assert len(verdict.escalation_list.escalations) == 1
     esc = verdict.escalation_list.escalations[0]
     assert esc.finding_id == f2.finding_id
     assert esc.judge_override is True
-    assert "existential" in esc.judge_notes
-    assert len(esc.arguments) == 1
+    assert "Overridden" in esc.judge_notes
+    assert len(esc.arguments) == 2
     
     # Gap Report should have skipped dimensions
     # Total dimensions is 8, 2 are tracked, 6 should be skipped

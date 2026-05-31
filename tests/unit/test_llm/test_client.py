@@ -140,7 +140,8 @@ class TestOllamaClientGenerate:
         assert response.raw_text == "not valid json"
 
     @pytest.mark.asyncio
-    async def test_generate_timeout_raises_llm_error(self) -> None:
+    @patch("asyncio.sleep", new_callable=AsyncMock)
+    async def test_generate_timeout_raises_llm_error(self, mock_sleep) -> None:
         mock_client_instance = AsyncMock()
         mock_client_instance.post = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
         mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
@@ -170,7 +171,8 @@ class TestOllamaClientGenerate:
             assert payload["options"]["num_predict"] == 100
 
     @pytest.mark.asyncio
-    async def test_generate_http_error_raises_llm_error(self) -> None:
+    @patch("asyncio.sleep", new_callable=AsyncMock)
+    async def test_generate_http_error_raises_llm_error(self, mock_sleep) -> None:
         mock_client_instance = AsyncMock()
         mock_client_instance.post = AsyncMock(side_effect=httpx.HTTPError("http error"))
         mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)

@@ -7,6 +7,7 @@ from src.hitl.escalation import create_escalation, update_escalation_status, res
 from src.hitl.dispute import handle_user_dispute
 from src.hitl.delta_engine import trigger_delta_reanalysis
 from src.hitl.audit import get_audit_trail_for_finding
+from unittest.mock import MagicMock
 
 @pytest.fixture
 def test_db():
@@ -113,3 +114,74 @@ def test_audit_query_service(test_db, sample_deal_and_finding):
     assert resp.finding_id == finding_id
     assert len(resp.transcripts) == 1
     assert resp.transcripts[0].persona_name == "Critic"
+
+def test_audit_records_found_for_finding(test_db, sample_deal_and_finding):
+    deal_id, finding_id = sample_deal_and_finding
+    audit = AuditRecord(
+        deal_id=deal_id,
+        event_type="TEST",
+        actor="user",
+        description=f"found {finding_id} in log",
+        raw_payload={}
+    )
+    test_db.add(audit)
+    test_db.commit()
+    resp = get_audit_trail_for_finding(test_db, finding_id)
+    assert len(resp.audit_records) == 1
+
+def test_dispute_scenario_d_and_a_c(test_db, sample_deal_and_finding):
+    deal_id, finding_id = sample_deal_and_finding
+    
+    # Scenario D
+    req = DisputeRequest(scenario="D", dispute_reason="Need info")
+    resp = handle_user_dispute(test_db, deal_id, finding_id, req, "user1")
+    assert getattr(resp, "finding_id", None) == finding_id # returns AuditTrailResponse
+    
+    # Scenario A
+    req = DisputeRequest(scenario="A", dispute_reason="False Positive")
+    dispute = handle_user_dispute(test_db, deal_id, finding_id, req, "user1")
+    assert dispute.status == "pending"
+    
+    # Scenario C
+    req = DisputeRequest(scenario="C", dispute_reason="Wrong Recommendation")
+    dispute = handle_user_dispute(test_db, deal_id, finding_id, req, "user1")
+    assert dispute.status == "pending"
+
+def test_escalation_exceptions_and_other_decisions(test_db, sample_deal_and_finding):
+    deal_id, finding_id = sample_deal_and_finding
+    
+    with pytest.raises(ValueError, match="not found"):
+        update_escalation_status(test_db, "bad-id", "in-progress", "admin")
+        
+    with pytest.raises(ValueError, match="not found"):
+        resolve_escalation(test_db, "bad-id", EscalationResolutionRequest(decision="resolve", decision_text="foo", resolved_by="admin"))
+        
+    esc = create_escalation(test_db, deal_id, finding_id)
+    
+    # Test update to resolved
+    updated = update_escalation_status(test_db, esc.escalation_id, "resolved", "admin")
+    assert updated.resolved_at is not None
+    
+    with pytest.raises(ValueError, match="already resolved"):
+        resolve_escalation(test_db, esc.escalation_id, EscalationResolutionRequest(decision="resolve", decision_text="foo", resolved_by="admin"))
+        
+    esc2 = create_escalation(test_db, deal_id, finding_id)
+    req2 = EscalationResolutionRequest(decision="request_docs", decision_text="foo", resolved_by="admin")
+    resolved2 = resolve_escalation(test_db, esc2.escalation_id, req2)
+    assert resolved2.status == "resolved"
+    
+    esc3 = create_escalation(test_db, deal_id, finding_id)
+    req3 = EscalationResolutionRequest(decision="accept_risk", decision_text="foo", resolved_by="admin")
+    resolved3 = resolve_escalation(test_db, esc3.escalation_id, req3)
+    assert resolved3.status == "resolved"
+    
+    esc4 = create_escalation(test_db, deal_id, finding_id)
+    # Bypass Pydantic validation to reach line 104
+    req4 = MagicMock()
+    req4.decision = "unknown"
+    req4.decision_text = "foo"
+    req4.resolved_by = "admin"
+    req4.model_dump.return_value = {}
+    with pytest.raises(ValueError, match="Unknown decision"):
+        resolve_escalation(test_db, esc4.escalation_id, req4)
+

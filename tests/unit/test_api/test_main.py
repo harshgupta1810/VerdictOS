@@ -17,7 +17,7 @@ def test_verdictos_error_handler() -> None:
     async def trigger_verdictos_error() -> None:
         raise DocumentIngestionError("Test ingestion error")
         
-    client = TestClient(test_app, raise_server_exceptions=False)
+    client = TestClient(test_app, raise_server_exceptions=False, headers={"X-API-Key": "dev-key-123"})
     response = client.get("/error-verdictos")
     assert response.status_code == 422
     data = response.json()
@@ -30,7 +30,7 @@ def test_verdictos_error_handler_500() -> None:
     async def trigger_verdictos_500() -> None:
         raise VerdictOSError("Generic verdictos error")
         
-    client = TestClient(test_app, raise_server_exceptions=False)
+    client = TestClient(test_app, raise_server_exceptions=False, headers={"X-API-Key": "dev-key-123"})
     response = client.get("/error-verdictos-500")
     assert response.status_code == 500
     data = response.json()
@@ -42,7 +42,7 @@ def test_value_error_handler() -> None:
     async def trigger_value_error() -> None:
         raise ValueError("Test value error")
         
-    client = TestClient(test_app, raise_server_exceptions=False)
+    client = TestClient(test_app, raise_server_exceptions=False, headers={"X-API-Key": "dev-key-123"})
     response = client.get("/error-value")
     assert response.status_code == 422
     data = response.json()
@@ -55,7 +55,7 @@ def test_unexpected_error_handler() -> None:
     async def trigger_generic_error() -> None:
         raise RuntimeError("Test generic error")
         
-    client = TestClient(test_app, raise_server_exceptions=False)
+    client = TestClient(test_app, raise_server_exceptions=False, headers={"X-API-Key": "dev-key-123"})
     response = client.get("/error-generic")
     assert response.status_code == 500
     data = response.json()
@@ -67,3 +67,11 @@ async def test_lifespan() -> None:
     from src.api.main import lifespan
     async with lifespan(app):
         pass
+
+def test_missing_api_key() -> None:
+    # No headers provided
+    test_app = create_app()
+    client = TestClient(test_app, raise_server_exceptions=False)
+    response = client.get("/error-verdictos")
+    assert response.status_code == 401
+    assert response.json()["error_code"] == "UNAUTHORIZED"
