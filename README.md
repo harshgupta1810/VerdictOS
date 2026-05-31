@@ -2,7 +2,7 @@
 
 **Enterprise-Grade Multi-Agent System for M&A Due Diligence, Asset Validation, and Transaction Risk Analysis**
 
-VerdictOS eliminates hallucination and semantic drift failures inherent in vector-similarity RAG pipelines by replacing them with a **deterministic, vectorless architecture**: Elasticsearch BM25 sparse retrieval, structural GraphRAG via NetworkX, and an adversarial 6-persona multi-round debate engine. Every finding is traceable to exact source text and verified through adversarial challenge — no hallucinated citations, no fabricated references.
+VerdictOS is a deterministic, production-ready AI system that eliminates hallucination and semantic drift failures inherent in vector-similarity RAG pipelines. Built with **vectorless Elasticsearch BM25 retrieval**, **structural GraphRAG via NetworkX**, and an **adversarial 6-persona multi-round debate engine**, VerdictOS ensures every finding is traceable to exact source text and verified through rigorous challenge—no hallucinated citations, no fabricated references.
 
 **Core principle:** In high-stakes legal work, speculative conclusions are liabilities. Confidence requires auditability.
 
@@ -10,19 +10,24 @@ VerdictOS eliminates hallucination and semantic drift failures inherent in vecto
 
 ## Why VerdictOS: Five Core Innovations
 
-### 1. **Eliminates Hallucinated Citations**
-Traditional RAG systems compress hyper-specific debt covenants near generic language, causing embeddings to retrieve irrelevant context and LLMs to fabricate section references. VerdictOS uses **BM25 sparse retrieval** (Elasticsearch) — exact keyword matching with no semantic compression — ensuring findings are anchored to actual contract text.
+### 1. **Vectorless Retrieval — Eliminates Hallucinated Citations**
+
+Vector embeddings compress hyper-specific debt covenants and liability clauses into proximity space with generic language, causing RAG systems to retrieve irrelevant context and LLMs to fabricate section references. VerdictOS replaces embeddings with **Elasticsearch BM25 sparse retrieval**—exact keyword matching with structured section-aware taxonomy. Finding accuracy depends on actual contract text, not semantic similarity scores.
 
 ### 2. **Deterministic Reasoning Over Probabilistic Search**
-Vector similarity introduces silent failure modes: a clause might retrieve as "similar enough" at 0.87 cosine similarity but be legally distinct. VerdictOS pre-builds a **structural knowledge graph** (spaCy NER + NetworkX) before any agent runs, resolving cross-references and entity ambiguity upfront — the right context is found, not guessed.
+
+Vector similarity introduces silent failures: a clause might retrieve at 0.87 cosine similarity but be legally distinct. VerdictOS **pre-builds a structural knowledge graph** (spaCy NER + NetworkX) *before* any agent runs, resolving cross-references and entity ambiguity upfront. The right context is determined, not guessed.
 
 ### 3. **Adversarial Multi-Persona Debate**
-Single-agent systems miss edge cases and rarely challenge their own assumptions. VerdictOS implements a 6-persona debate engine with 8 strategic tracks: **Skeptic, Extremist, Pragmatist, Risk-Focused, Compliance, and Business**. Each persona attacks findings independently with isolated prompts; consensus requires surviving rigorous challenge, not achieving high confidence alone.
 
-### 4. **Append-Only Audit Logs for Regulatory Compliance**
-Legal auditors and regulators require immutable AI reasoning trails. Human override is additive, never destructive. VerdictOS enforces append-only audit logs at the ORM level — UPDATE and DELETE are blocked on `DebateArg` and `AuditRecord` tables. Every decision is traceable; every override is logged.
+Single-agent systems miss edge cases and rarely challenge their own assumptions. VerdictOS implements a **6-persona debate engine across 8 strategic tracks**: Proponent (argues in favor), Critic (challenges evidence), Devil's Advocate (contrarian view), Valuation Skeptic (questions financials), Integration Realist (post-merger execution), and Regulator's Eye (compliance risk). Each persona attacks findings independently; consensus requires surviving rigorous challenge, not achieving high confidence alone.
+
+### 4. **Immutable Audit Logs for Regulatory Compliance**
+
+Legal auditors and regulators demand AI reasoning trails that cannot be altered retroactively. Human override is **additive, never destructive**. VerdictOS enforces append-only audit logs at the ORM level—UPDATE and DELETE are blocked on `DebateArg` and `AuditRecord` tables. Every decision is traceable; every override is logged.
 
 ### 5. **100% Local Open-Source LLMs**
+
 Confidential legal documents cannot egress to cloud APIs. VerdictOS runs exclusively on **local open-source models** (Ollama / vLLM): Llama-3 for reasoning, Qwen-2.5 for entity disambiguation. No data leaves your infrastructure; full control over model versions and custom fine-tuning.
 
 ---
@@ -39,7 +44,7 @@ Confidential legal documents cannot egress to cloud APIs. VerdictOS runs exclusi
 | **Knowledge Graph** | spaCy NER + NetworkX | Pre-flight DiGraph built before agent execution |
 | **Specialist Routing** | Planner Agent (16 specialists) | Activates only relevant agents; 30–60% token savings |
 | **Adversarial Debate** | 6 personas, 8 strategic tracks | 3-round max, Asyncio Semaphore (40), dimension gating |
-| **Consensus Synthesis** | Debate consensus mapper | Structured JSON synthesis from debate transcripts |
+| **Consensus Synthesis** | Majority-rule counting | Structured JSON synthesis from debate transcripts |
 | **Verdict Generation** | Judge Agent | Final verdict with gap reports for unresolved findings |
 | **LLM Stack** | Ollama (Llama-3, Qwen-2.5) | 100% local open-source, no cloud API calls |
 | **Schema Contracts** | Pydantic V2 | Strict validation at every agent boundary |
@@ -50,86 +55,80 @@ Confidential legal documents cannot egress to cloud APIs. VerdictOS runs exclusi
 
 ---
 
-## System Phases (Fully Implemented)
+## System Architecture: 8-Phase Pipeline
 
-| Phase | Component | Status | Purpose |
-|-------|-----------|--------|---------|
-| **Phase 1** | Pre-Flight Pipeline | ✅ Complete | Document parsing, chunking, clause classification, GraphRAG construction, Elasticsearch indexing |
-| **Phase 2** | Specialist Agent System | ✅ Complete | 16 domain specialists, planner agent, vocabulary-indexed discovery, Celery task routing |
-| **Phase 3** | Adversarial Debate Engine | ✅ Complete | 6-persona debate, 8 strategic tracks, 3-round max, consensus synthesis, gap reporting |
-| **Phase 4** | Judge Agent & Verdict Synthesis | ✅ Complete | Final verdict generation, confidence scoring, finding aggregation, structured output |
-| **Phase 5** | REST API & FastAPI Gateway | ✅ Complete | Deal submission, status streaming, verdict retrieval, audit log access |
-| **Phase 6** | Human-in-the-Loop System | ✅ Complete | Escalation management, dispute resolution, audit trail logging |
-| **Phase 7** | Delta Engine & Incremental Re-analysis | ✅ Complete | Document delta tracking, selective re-indexing, finding merging, supplementary verdict updates |
-| **Phase 8** | Advanced Escalation & Approval Workflow | ✅ Complete | Multi-level escalation routing, priority management, approval chains, SLA tracking, human judgment integration |
-
-### Phase Flow Diagram
+VerdictOS processes M&A documents through a fully deterministic pipeline with clear phase boundaries, each with defined responsibilities and measurable outputs.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                   │
-│  Phase 1: Ingest & Index (Synchronous Pre-Flight)               │
-│  ├─ PDF/DOCX parsing, section-aware chunking                    │
-│  ├─ Clause classification (16 types)                            │
-│  ├─ Entity resolution (3-tier: exact → fuzzy → LLM)             │
-│  ├─ GraphRAG knowledge graph construction                        │
-│  └─ Elasticsearch BM25 indexing                                 │
-│                          │                                       │
-│                          ▼                                       │
-│  Phase 2: Smart Dispatch & Specialist Analysis (Async)          │
-│  ├─ Planner Agent activates domain specialists                  │
-│  ├─ Specialist agents query indexed documents                   │
-│  ├─ Parallel task execution via Celery + Redis                  │
-│  └─ Finding aggregation by 8 strategic dimensions               │
-│                          │                                       │
-│                          ▼                                       │
-│  Phase 3: Dimension Gating & Findings Aggregation (Async)       │
-│  ├─ Group findings by 8 strategic dimensions                    │
-│  ├─ Apply gating filter (skip debate if < 3 findings)           │
-│  └─ Route sparse findings to evidence gaps                      │
-│                          │                                       │
-│                          ▼                                       │
-│  Phase 4: Adversarial Debate Engine (Async)                     │
-│  ├─ 6 debate personas (Skeptic, Extremist, Pragmatist, etc.)    │
-│  ├─ 8 strategic tracks with validation gates                    │
-│  ├─ 3-round maximum with early-exit on consensus               │
-│  └─ Steelman rule enforcement via Pydantic validation           │
-│                          │                                       │
-│                          ▼                                       │
-│  Phase 5: Consensus Mapping (Deterministic Math)                │
-│  ├─ Aggregate persona stances (majority-rule counting)          │
-│  ├─ Sort findings: Settled, Contested, Unresolved               │
-│  └─ Filter for Judge Agent processing                           │
-│                          │                                       │
-│                          ▼                                       │
-│  Phase 6: Judge Synthesis (Async LLM)                           │
-│  ├─ Judge Agent processes Contested/Unresolved                  │
-│  ├─ Generate final verdict with confidence scoring              │
-│  └─ Create Go/No-Go Brief & Evidence Gap Report                 │
-│                          │                                       │
-│                          ▼                                       │
-│  Phase 7: Delta Engine & Incremental Re-analysis                │
-│  ├─ Track document deltas on supplementary uploads              │
-│  ├─ Selective re-indexing (only new/modified chunks)            │
-│  ├─ Re-run affected specialists                                 │
-│  └─ Merge supplementary findings into existing verdict          │
-│                          │                                       │
-│                          ▼                                       │
-│  Phase 8: Advanced Escalation & Approval Workflow               │
-│  ├─ Multi-level escalation routing                              │
-│  ├─ Human escalation & dispute management                       │
-│  ├─ Approval chain workflows with SLA tracking                  │
-│  ├─ Immutable audit trails for all decisions                    │
-│  └─ Delta re-analysis on user disputes                          │
-│                          │                                       │
-│                          ▼                                       │
-│  FastAPI REST Gateway & Verdict Output                          │
-│  ├─ WebSocket status streaming                                  │
-│  ├─ Structured verdict retrieval                                │
-│  └─ Audit log access & compliance reporting                     │
-│                                                                   │
-└─────────────────────────────────────────────────────────────────┘
+Phase 1: Ingest & Index (Synchronous Pre-Flight)
+  ├─ PDF/DOCX parsing, section-aware chunking
+  ├─ Clause classification (16 types)
+  ├─ Entity resolution (3-tier)
+  ├─ GraphRAG knowledge graph construction
+  └─ Elasticsearch BM25 indexing
+           │
+           ▼
+Phase 2: Smart Dispatch & Specialist Analysis (Async)
+  ├─ Planner Agent activates domain specialists (16 agents)
+  ├─ Specialist agents query indexed documents
+  └─ Parallel task execution via Celery + Redis
+           │
+           ▼
+Phase 3: Dimension Gating & Findings Aggregation (Async)
+  ├─ Group findings by 8 strategic dimensions
+  ├─ Apply gating filter (skip debate if < 3 findings)
+  └─ Route sparse findings to evidence gaps
+           │
+           ▼
+Phase 4: Adversarial Debate Engine (Async)
+  ├─ 6 debate personas attack findings independently
+  ├─ 8 strategic tracks with 5 validation gates
+  ├─ 3-round maximum with early-exit on consensus
+  └─ Steelman rule enforcement via Pydantic
+           │
+           ▼
+Phase 5: Consensus Mapping (Deterministic Math)
+  ├─ Aggregate persona stances (majority-rule counting)
+  ├─ Sort: Settled, Contested, Unresolved
+  └─ Filter for Judge Agent processing
+           │
+           ▼
+Phase 6: Judge Synthesis (Async LLM)
+  ├─ Judge Agent processes Contested/Unresolved (90% token savings)
+  ├─ Generate final verdict with confidence scoring
+  └─ Create Go/No-Go Brief & Evidence Gap Report
+           │
+           ▼
+Phase 7: Delta Engine & Incremental Re-analysis
+  ├─ Track document deltas on supplementary uploads
+  ├─ Selective re-indexing (only new/modified chunks)
+  ├─ Re-run affected specialists
+  └─ Merge supplementary findings into verdict
+           │
+           ▼
+Phase 8: Advanced Escalation & Approval Workflow
+  ├─ Multi-level escalation routing with priority management
+  ├─ Human escalation & dispute management
+  ├─ Approval chain workflows with SLA tracking
+  ├─ Immutable audit trails for all decisions
+  └─ Delta re-analysis on user disputes
+           │
+           ▼
+       FastAPI REST Gateway & Verdict Output
 ```
+
+### Fully Implemented Phases
+
+| Phase | Component | Status | Highlights |
+|-------|-----------|--------|-----------|
+| **1** | Pre-Flight Pipeline | ✅ Complete | PDF/DOCX parsing, 16-type clause classification, 3-tier entity resolution, GraphRAG |
+| **2** | Specialist Dispatch | ✅ Complete | 16 domain agents, planner routing, Celery task distribution, vocabulary indexing |
+| **3** | Dimension Gating | ✅ Complete | 8 strategic dimensions, sparse finding routing, debate qualification |
+| **4** | Debate Engine | ✅ Complete | 6-persona adversarial debate, 3-round max, 5 validation gates, Steelman enforcement |
+| **5** | Consensus Mapping | ✅ Complete | Majority-rule aggregation, Settled/Contested/Unresolved classification |
+| **6** | Judge Synthesis | ✅ Complete | Verdict generation, confidence scoring, gap reporting, Go/No-Go brief |
+| **7** | Delta Engine | ✅ Complete | Incremental re-analysis, delta tracking, selective re-indexing, finding merging |
+| **8** | Escalation & Audit | ✅ Complete | Multi-level routing, SLA tracking, append-only audit logs, dispute resolution |
 
 ---
 
@@ -139,22 +138,22 @@ VerdictOS classifies document chunks into 16 domain-specific clause types and ro
 
 | Clause Type | Specialist Agent | Domain |
 |--|--|--|
-| `TAX_PROVISION` | `tax_agent` | Tax indemnities, provisions |
 | `IP_ASSIGNMENT` | `ip_agent` | Patents, copyright, IP ownership |
-| `LIABILITY_CAP` | — | Damages caps, liability limitations |
+| `TAX_PROVISION` | `tax_agent` | Tax indemnities, provisions |
+| `INDEMNIFICATION` | `litigation_agent` | Indemnity obligations, carve-outs |
 | `FX_HEDGING` | `finance_agent` | Currency hedging, forex covenants |
 | `EMPLOYMENT_TERM` | `hr_agent` | Employee agreements, severance |
 | `CHANGE_OF_CONTROL` | `governance_agent` | CoC triggers, governance changes |
-| `INDEMNIFICATION` | `litigation_agent` | Indemnity obligations, carve-outs |
 | `DATA_PROTECTION` | `privacy_agent` | GDPR, privacy covenants |
 | `INSURANCE_POLICY` | `insurance_agent` | Coverage terms, policy requirements |
-| `GOVERNANCE_CLAUSE` | `governance_agent` | Board governance, voting rights |
 | `RELATED_PARTY_TRANSACTION` | `related_party_agent` | Related-party deals, conflicts |
 | `CYBER_SECURITY` | `cyber_agent` | Security obligations, breach response |
 | `SUPPLIER_CONTRACT` | `supplier_agent` | Supply chain, vendor terms |
 | `CUSTOMER_CONTRACT` | `customer_agent` | Customer agreements, SLAs |
 | `REPUTATION_RISK` | `reputation_agent` | Reputational risk clauses |
 | `ESG_OBLIGATION` | `esg_agent` | ESG commitments, sustainability |
+| `LIABILITY_CAP` | `finance_agent` / `litigation_agent` | Damages caps, liability limitations |
+| `GOVERNANCE_CLAUSE` | `governance_agent` | Board governance, voting rights |
 
 ---
 
@@ -168,7 +167,7 @@ VerdictOS classifies document chunks into 16 domain-specific clause types and ro
 | **Docker Desktop** | latest | Elasticsearch, Redis, PostgreSQL, Ollama |
 | **Git** | latest | Version control |
 
-### Installation
+### Quick Start
 
 ```bash
 # 1. Clone the repository
@@ -186,14 +185,28 @@ source .venv/bin/activate
 
 # 3. Install dependencies
 pip install -r requirements.txt
-# or via Makefile
-make install
 
 # 4. Download spaCy model (required for GraphRAG)
-python -m spacy download en_core_web_sm
+python -m spacy download en_core_web_lg
 
 # 5. Copy environment configuration
 cp .env.example .env
+
+# 6. Start full infrastructure stack
+docker compose -f docker/docker-compose.yml up -d
+
+# 7. Initialize database
+python scripts/setup_database.py
+alembic upgrade head
+
+# 8. Pull Ollama models
+python scripts/pull_models.py
+
+# 9. Start API server
+make run
+
+# 10. Access interactive API docs
+# Open http://localhost:8000/docs in your browser
 ```
 
 ### Environment Configuration
@@ -207,8 +220,8 @@ ELASTICSEARCH_INDEX=verdictos_documents
 
 # Local LLM (Ollama / vLLM)
 OLLAMA_URL=http://localhost:11434
-LLM_REASONING_MODEL=llama3
-LLM_DISAMBIGUATION_MODEL=qwen2.5
+LLM_REASONING_MODEL=llama3:8b
+LLM_DISAMBIGUATION_MODEL=qwen2.5:7b
 
 # Message Queue
 REDIS_URL=redis://localhost:6379/0
@@ -223,15 +236,15 @@ JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 ```
 
-### Infrastructure Setup
-
-#### Option A: Full Stack (Recommended)
+### Infrastructure Services
 
 ```bash
+# Full stack (all services)
 docker compose -f docker/docker-compose.yml up -d
-```
 
-This starts all services on their default ports:
+# Individual services
+docker compose -f docker/docker-compose.yml up elasticsearch redis postgres ollama -d
+```
 
 | Service | Port | Purpose |
 |---------|------|---------|
@@ -241,39 +254,6 @@ This starts all services on their default ports:
 | `redis` | 6379 | Celery message broker |
 | `postgres` | 5432 | Primary database |
 | `ollama` | 11434 | Local LLM server |
-
-#### Option B: Individual Services
-
-```bash
-# Elasticsearch only (Phase 1 live indexing)
-docker compose -f docker/docker-compose.yml up elasticsearch -d
-
-# Full infrastructure minus app containers
-docker compose -f docker/docker-compose.yml up elasticsearch redis postgres ollama -d
-```
-
-### Database Initialization
-
-```bash
-# Initialize schema
-python scripts/setup_database.py
-
-# Apply migrations
-alembic upgrade head
-# or
-make migrate
-```
-
-### Pull Ollama Models
-
-```bash
-# Automatic: waits for Ollama readiness, then pulls
-python scripts/pull_models.py
-
-# Manual
-ollama pull llama3:8b
-ollama pull qwen2.5:7b
-```
 
 ---
 
@@ -288,50 +268,10 @@ Phase 1 is the synchronous boundary that parses documents, classifies clauses, b
 python scripts/run_pipeline.py testing_pdfs/Merger_Agreement.pdf
 
 # Live Elasticsearch indexing (ES auto-polled for 60 seconds)
-docker compose -f docker/docker-compose.yml up elasticsearch -d
 python scripts/run_pipeline.py testing_pdfs/Merger_Agreement.pdf
 
 # Multiple documents
 python scripts/run_pipeline.py testing_pdfs/Merger_Agreement.pdf testing_pdfs/Amendment.pdf
-```
-
-**Sample Output:**
-```
-[ES] Connected to http://localhost:9200 (attempt 1) — live indexing enabled.
-
-Running Phase 1 pre-flight on 1 document(s)...
-
-======================================================================
-PHASE 1 PRE-FLIGHT REPORT
-======================================================================
-
-Documents parsed: 1
-  - Merger_Agreement.pdf (123 pages)
-
-Chunks produced:  390
-
-Clause-type distribution:
-  general                ######################################## 253
-  change_of_control      ############################ 81
-  employment_term        ################### 25
-  tax_provision          ############ 13
-  ip_assignment          ############ 10
-  ...
-
-GraphRAG graph:
-  Entity nodes      : 801  (5 confirmed, 796 unconfirmed)
-  Section nodes     : 215
-  Edges             : 21744
-
-Indexing outcome:
-  Attempted : 390
-  Indexed   : 390
-
-Planner manifest (targeted specialists):
-  [+] ip_agent                   intellectual property, patent, copyright...
-  [+] litigation_agent           litigation, lawsuit, arbitration...
-  [+] finance_agent              financial covenants, FX hedging...
-======================================================================
 ```
 
 ### API Server
@@ -357,7 +297,8 @@ Interactive API documentation: `http://localhost:8000/docs`
 | `POST` | `/api/v1/deals/{id}/escalate` | Escalate finding for human review |
 | `POST` | `/api/v1/deals/{id}/dispute` | User dispute against a finding |
 | `POST` | `/api/v1/deals/{id}/delta` | Trigger incremental re-analysis |
-| `GET` | `/health` | Health check |
+| `WebSocket` | `/api/v1/deals/{id}/stream` | Real-time pipeline event stream |
+| `GET` | `/health` | Service health check |
 
 ### Celery Worker
 
@@ -371,11 +312,11 @@ celery -A src.workers.celery_app worker --loglevel=info
 
 ---
 
-## Human-in-the-Loop Capabilities (Phases 6-7)
+## Human-in-the-Loop Capabilities
 
 ### Escalation Management
 
-Analysts can escalate findings that require human judgment:
+Analysts can escalate findings requiring human judgment:
 
 ```python
 from src.hitl.escalation import create_escalation, resolve_escalation
@@ -387,7 +328,7 @@ escalation = create_escalation(db, deal_id, finding_id)
 resolution = resolve_escalation(
     db=db,
     escalation_id=escalation.escalation_id,
-    decision="approved",
+    decision="resolve",
     reasoning="Verified against source documentation",
     actor="compliance_officer"
 )
@@ -435,10 +376,10 @@ from src.hitl.audit import get_audit_trail_for_finding
 audit_trail = get_audit_trail_for_finding(db, finding_id)
 # Returns: [
 #   {"event": "FINDING_CREATED", "agent": "ip_agent", "timestamp": "..."},
-#   {"event": "DEBATE_ROUND_1", "persona": "skeptic", "timestamp": "..."},
-#   {"event": "CONSENSUS_REACHED", "confidence": 0.92, "timestamp": "..."},
+#   {"event": "DEBATE_ROUND_1", "persona": "critic", "timestamp": "..."},
+#   {"event": "CONSENSUS_REACHED", "confidence": "high", "timestamp": "..."},
 #   {"event": "ESCALATION_CREATED", "actor": "human", "timestamp": "..."},
-#   {"event": "ESCALATION_RESOLVED", "decision": "approved", "timestamp": "..."}
+#   {"event": "ESCALATION_RESOLVED", "decision": "resolve", "timestamp": "..."}
 # ]
 ```
 
@@ -446,7 +387,7 @@ audit_trail = get_audit_trail_for_finding(db, finding_id)
 
 ## Testing
 
-All 66+ unit and integration tests run **offline** — no Docker, no Ollama required.
+All tests run **offline** — no Docker, no Ollama required.
 
 ```bash
 # All tests
@@ -491,7 +432,7 @@ make test-integration
 # Lint and type-check
 make lint
 
-# Ruff linter only
+# Ruff linter
 ruff check src/ tests/
 
 # Mypy type checking
@@ -600,41 +541,26 @@ VerdictOS/
 
 Seven SQLAlchemy ORM tables power the system:
 
-| Table | Purpose |
-|-------|---------|
-| `Deal` | M&A transaction record, file manifest, state tracking |
-| `Finding` | Agent-discovered finding — claim, citation, confidence, severity |
-| `DebateArg` | Individual debate argument (append-only) — persona, stance, steelman |
-| `AuditRecord` | Immutable audit log (append-only) — event type, actor, timestamp, payload |
-| `Escalation` | Issue escalated for human review — status, decision, resolver |
-| `Dispute` | End-user dispute against a finding |
-| `DeltaRun` | Delta analysis execution for incremental index updates |
+| Table | Purpose | Append-Only |
+|-------|---------|------------|
+| `Deal` | M&A transaction record, file manifest, state tracking | ❌ |
+| `Finding` | Agent-discovered finding — claim, citation, confidence, severity | ❌ |
+| `DebateArg` | Individual debate argument — persona, stance, steelman | ✅ |
+| `AuditRecord` | Immutable audit log — event type, actor, timestamp, payload | ✅ |
+| `Escalation` | Issue escalated for human review — status, decision, resolver | ❌ |
+| `Dispute` | End-user dispute against a finding | ❌ |
+| `DeltaRun` | Delta analysis execution for incremental index updates | ❌ |
 
 **Append-Only Enforcement:** `DebateArg` and `AuditRecord` tables block UPDATE and DELETE at the ORM level — audit trails are immutable.
 
 ### Deal State Machine
 
 ```
-created → indexing → analyzing → debating → judging → complete
-                                                         ↓
-                              error ←──────────────────── (any state)
-                              error → recovery / indexing (recovery)
+created → indexing → analyzing → aggregating → debating → judging → complete
+                                                                       ↓
+                                    error ←──────────────────────────── (any state)
+                                    error → recovery / indexing (recovery)
 ```
-
----
-
-## Key Design Decisions
-
-| Decision | Rationale |
-|----------|-----------|
-| **BM25 over Embeddings** | Embeddings compress hyper-specific clauses near generic text, causing drift on debt covenants and exact clause matching. BM25 ensures exact keyword retrieval. |
-| **Local Open-Source LLMs** | Legal documents are confidential; cloud egress violates data security and client trust. 100% local inference on Ollama / vLLM. |
-| **Pre-Flight GraphRAG** | Cross-references broken by chunking must be resolved upfront before agents analyze findings. GraphRAG built before debate engine runs. |
-| **Append-Only Audit Logs** | Regulatory and legal auditors require immutable AI reasoning trails. Human judgment is additive, never destructive. |
-| **3-Round Hard Cap** | Guarantees system termination. Findings unresolved in 3 rounds route to explicit gap reports rather than speculative consensus. |
-| **Pydantic V2 Contracts** | Open-source LLMs produce malformed JSON. Pydantic retry loops with exact error messages enable self-healing without human intervention. |
-| **Asyncio Semaphore (40)** | Debate parallelism bounded to prevent resource exhaustion. Token budgets for local models optimized at this concurrency level. |
-| **HITL Escalation Layer** | Analysts need human judgment for edge cases. Escalation system enables structured human review with immutable decision logging. |
 
 ---
 
@@ -642,7 +568,7 @@ created → indexing → analyzing → debating → judging → complete
 
 - **Phase 1 Parsing:** ~20–50 pages/second (PDF parsing is I/O bound; use thread pools)
 - **Chunk Count:** 300–500 chunks per 100-page document (200–500 token windows, no overlap)
-- **Entity Resolution:** 800–1200 entities per 100-page document; Tier 1 (exact) resolves 60–70%, Tier 2 (fuzzy) adds 20–25%, Tier 3 (LLM) adds 5–10%
+- **Entity Resolution:** 800–1200 entities per 100-page document; Tier 1 (exact) resolves ~80%, Tier 2 (fuzzy) adds ~15%, Tier 3 (LLM) adds ~5%
 - **BM25 Indexing:** ~2–5 seconds per 100 chunks (Elasticsearch on commodity hardware)
 - **Debate Token Budget:** ~4,000–6,000 tokens per finding (3 rounds × 6 personas × context compression)
 - **Full Analysis:** 5–15 minutes end-to-end for 100-page document (Ollama on 8-core CPU)
@@ -650,11 +576,26 @@ created → indexing → analyzing → debating → judging → complete
 
 ---
 
+## Key Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **BM25 over Embeddings** | Embeddings compress hyper-specific clauses near generic text, causing drift on debt covenants. BM25 ensures exact keyword retrieval. |
+| **Local Open-Source LLMs** | Confidential documents cannot egress to cloud APIs. 100% local inference on Ollama / vLLM. |
+| **Pre-Flight GraphRAG** | Cross-references broken by chunking must be resolved upfront. GraphRAG built before debate engine runs. |
+| **Append-Only Audit Logs** | Regulatory auditors require immutable reasoning trails. Human judgment is additive, never destructive. |
+| **3-Round Hard Cap** | Guarantees system termination. Unresolved findings route to gap reports rather than speculative consensus. |
+| **Pydantic V2 Contracts** | Open-source LLMs produce malformed JSON. Pydantic retry loops enable self-healing without human intervention. |
+| **Asyncio Semaphore (40)** | Debate parallelism bounded to prevent resource exhaustion. Token budgets optimized at this concurrency level. |
+| **HITL Escalation Layer** | Analysts need human judgment for edge cases. Escalation system enables structured review with immutable logging. |
+
+---
+
 ## Extensibility
 
 ### Adding a New Specialist Agent
 
-1. Create a new file in `src/agents/specialist_agents/` following the `SpecialistAgent` base class.
+1. Create a new file in `src/agents/` following the `SpecialistAgent` base class.
 2. Define domain-specific prompt and vocabulary index.
 3. Register in `src/agents/planner_agent.py` — add to `SPECIALIST_REGISTRY` with trigger keywords.
 4. Add integration test in `tests/integration/`.
@@ -665,7 +606,7 @@ created → indexing → analyzing → debating → judging → complete
 2. Update `src/ingestion/schemas.py` — add to `ClauseType` enum.
 3. Add test cases in `tests/unit/test_ingestion/test_classifier.py`.
 
-### Custom Persona
+### Custom Debate Persona
 
 1. Define in `src/debate/personas.py` — extend the `Persona` dataclass.
 2. Add debate logic in `src/debate/orchestrator.py`.
@@ -748,19 +689,6 @@ celery -A src.workers.celery_app inspect active
 make worker
 ```
 
-### Escalation Not Created
-
-```bash
-# Verify database connection
-python scripts/setup_database.py
-
-# Check audit table exists
-psql -U postgres -d verdictos -c "\dt audit_record"
-
-# Manually trigger escalation
-python -c "from src.hitl.escalation import create_escalation; ..."
-```
-
 ---
 
 ## Contributing
@@ -781,12 +709,13 @@ Proprietary. See LICENSE file for details.
 
 ---
 
-## Support
+## Support & Contact
 
 For issues, feature requests, or technical questions:
+
 - **GitHub Issues:** [VerdictOS Issues](https://github.com/harshgupta1810/VerdictOS/issues)
-- **Email:** harshgup11@gmail.com
+- **Email:** [harshgup11@gmail.com](mailto:harshgup11@gmail.com)
 
 ---
 
-**VerdictOS — Enterprise-grade determinism for high-stakes legal reasoning. Trusted by M&A teams that can't afford speculation.**
+**VerdictOS — Enterprise-grade determinism for high-stakes legal reasoning. Built for M&A teams that cannot afford speculation.**
