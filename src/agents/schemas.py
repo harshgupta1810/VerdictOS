@@ -289,3 +289,27 @@ class DispatchResult(BaseModel):
     agents_dispatched: int = Field(default=0, ge=0)
     agents_failed: int = Field(default=0, ge=0)
     duration_ms: int = Field(default=0, ge=0)
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: Judge Synthesis — Output Contracts
+# ---------------------------------------------------------------------------
+
+class JudgeVerdictStatus(str, Enum):
+    """The final outcome of the Judge synthesis phase."""
+    
+    CONFIRMED = "confirmed"
+    EVIDENCE_NOT_FOUND = "evidence_not_found"
+    OVERRIDDEN = "overridden"
+
+
+class JudgeSynthesisResult(BaseModel):
+    """Structured judgment for a debated finding from Phase 6."""
+    
+    model_config = ConfigDict(extra="forbid")
+
+    finding_id: str = Field(min_length=1)
+    status: JudgeVerdictStatus
+    judge_override_flag: bool = False
+    synthesis_rationale: str = ""
+    calibrated_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
