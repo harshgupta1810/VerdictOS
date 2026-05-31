@@ -106,6 +106,7 @@ class TestDimensionStateTrackerPersistence:
         tracker.initialize([FindingDimension.RISK_EXPOSURE])
 
         mock_session = AsyncMock()
+        mock_session.add = MagicMock()
         # Simulate no existing record found
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
@@ -162,3 +163,40 @@ class TestDimensionStateTrackerPersistence:
 
         assert tracker.get_state(FindingDimension.RISK_EXPOSURE) == DimensionState.SETTLED
         assert tracker.get_round_number(FindingDimension.RISK_EXPOSURE) == 3
+
+
+    @pytest.mark.asyncio
+    async def test_persist_rolls_back_on_commit_error(self) -> None:
+        tracker = DimensionStateTracker(deal_id="deal-1")
+        tracker.initialize([FindingDimension.RISK_EXPOSURE])
+        
+        mock_session = AsyncMock()
+        mock_session.add = MagicMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_session.execute.return_value = mock_result
+        mock_session.commit.side_effect = Exception("DB error")
+        
+        with pytest.raises(Exception, match="DB error"):
+            await tracker.persist(mock_session)
+            
+        mock_session.rollback.assert_called_once()
+
+
+    @pytest.mark.asyncio
+    async def test_load_skips_unknown_dimension_or_state(self) -> None:
+        tracker = DimensionStateTracker(deal_id="deal-1")
+        
+        mock_record = MagicMock()
+        mock_record.dimension = "unknown_dim"
+        mock_record.state = "unknown_state"
+        mock_record.round_number = 3
+        mock_record.findings_count = 5
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_record]
+        mock_session = AsyncMock()
+        mock_session.execute.return_value = mock_result
+        
+        await tracker.load(mock_session)
+        assert len(tracker.get_all_states()) == 0

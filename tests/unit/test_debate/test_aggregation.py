@@ -323,3 +323,53 @@ async def test_evaluate_dimension_gate_skipped_and_writes_gap() -> None:
     
     added_descriptions = [call[0][0].description for call in mock_session.add.call_args_list]
     assert any("exit_scenario" in desc for desc in added_descriptions)
+
+
+@pytest.mark.asyncio
+async def test_validate_findings_pool_db_error() -> None:
+    raw_list = [{"invalid": "finding"}]
+    mock_session = AsyncMock()
+    mock_session.add = MagicMock(side_effect=Exception("DB error"))
+    valid = await validate_findings_pool(raw_list, deal_id="deal-1", db_session=mock_session)
+    assert len(valid) == 0
+
+
+def test_normalize_confidences_invalid_type() -> None:
+    f = _make_finding(AgentName.IP)
+    f.__dict__["confidence"] = "invalid"  # Bypass pydantic validation
+    normalize_confidences([f])
+    assert f.confidence == Confidence.MEDIUM
+
+
+def test_merge_graphrag_links_early_return() -> None:
+    findings = [_make_finding(AgentName.IP)]
+    # pyrefly: ignore [bad-argument-type]
+    assert merge_graphrag_links(findings, None) == findings
+    assert merge_graphrag_links([], nx.DiGraph()) == []
+    assert merge_graphrag_links(findings, nx.DiGraph()) == findings
+
+
+def test_map_findings_fallback_primary_agent() -> None:
+    f = _make_finding(AgentName.IP, clause_type=ClauseType.GENERAL)
+    mapped = map_findings_to_dimensions([f])
+    assert f.dimension == FindingDimension.REGULATORY_APPROVAL
+
+
+def test_map_findings_fallback_schema_dimension() -> None:
+    from unittest.mock import patch
+    f = _make_finding(AgentName.IP, clause_type=ClauseType.GENERAL)
+    f.dimension = FindingDimension.STRATEGIC_FIT 
+    
+    with patch.dict("src.debate.aggregation.PRIMARY_AGENT_TO_DIMENSION_MAP", {}, clear=True):
+        mapped = map_findings_to_dimensions([f])
+        
+    assert f.dimension == FindingDimension.STRATEGIC_FIT
+    assert f in mapped[FindingDimension.STRATEGIC_FIT]
+
+
+@pytest.mark.asyncio
+async def test_evaluate_dimension_gate_db_error() -> None:
+    mock_session = AsyncMock()
+    mock_session.add = MagicMock(side_effect=Exception("DB Error"))
+    gates = await evaluate_dimension_gate({}, deal_id="deal-1", db_session=mock_session)
+    assert gates[FindingDimension.EXIT_SCENARIO].mode == DimensionActivationMode.SKIPPED

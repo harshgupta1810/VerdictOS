@@ -42,6 +42,8 @@ def test_ingestion_schemas_accept_valid_document_chunk_and_classification() -> N
     ("model", "payload"),
     [
         (LayoutElement, {"kind": "word", "text": "bad", "x0": 1}),
+        (LayoutElement, {"kind": "word", "text": "bad", "x0": 2, "x1": 1, "top": 1, "bottom": 2}),
+        (LayoutElement, {"kind": "word", "text": "bad", "x0": 1, "x1": 2, "top": 2, "bottom": 1}),
         (ParsedPage, {"page_index": -1, "text": ""}),
         (
             ParsedDocument,
@@ -223,4 +225,50 @@ def test_compute_file_fingerprint(tmp_path: Path) -> None:
 
     assert compute_file_fingerprint(f1) == compute_file_fingerprint(f2)
     assert compute_file_fingerprint(f1) != compute_file_fingerprint(f3)
+
+
+def test_split_paragraph_on_page_breaks_special_nodes() -> None:
+    from src.ingestion.ingest import _split_paragraph_on_page_breaks
+    from docx.oxml.ns import qn
+    
+    class MockNode:
+        def __init__(self, tag, text=None, attrs=None):
+            self.tag = tag
+            self.text = text
+            self.attrs = attrs or {}
+        def get(self, key):
+            return self.attrs.get(key)
+            
+    class MockP:
+        def iter(self):
+            yield MockNode(qn("w:t"), "Hello")
+            yield MockNode(qn("w:tab"))
+            yield MockNode(qn("w:t"), "World")
+            yield MockNode(qn("w:br"), attrs={qn("w:type"): "textWrapping"})
+            yield MockNode(qn("w:t"), "Line2")
+            yield MockNode(qn("w:lastRenderedPageBreak"))
+            yield MockNode(qn("w:t"), "Page2")
+            
+    class MockParagraph:
+        _p = MockP()
+        
+    fragments = _split_paragraph_on_page_breaks(MockParagraph())  # type: ignore[arg-type]
+    assert len(fragments) == 2
+    assert fragments[0] == "Hello\tWorld\nLine2"
+    assert fragments[1] == "Page2"
+
+
+def test_pdf_parser_reraises_document_ingestion_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import src.ingestion.ingest as ingest_mod
+    
+    pdf_path = tmp_path / "valid.pdf"
+    _write_pdf(pdf_path, [[(50, 750, "Left One")]])
+    
+    def mock_parse_page(*args, **kwargs):
+        raise DocumentIngestionError("mocked inner error")
+        
+    monkeypatch.setattr(ingest_mod.DocumentIngestor, "_parse_pdf_page", mock_parse_page)
+    
+    with pytest.raises(DocumentIngestionError, match="mocked inner error"):
+        ingest_mod.DocumentIngestor().parse(pdf_path)
 

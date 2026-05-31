@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.db.models import AuditRecord, Base, Deal, DebateArg, Dispute, Escalation, Finding, DeltaRun, InvalidStateTransitionError
+from src.db.models import AuditRecord, Base, Deal, DebateArg, Dispute, Escalation, Finding, DeltaRun, InvalidStateTransitionError, validate_state_transition
 
 DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -199,3 +199,6 @@ async def test_invalid_deal_status_transitions(db_session: AsyncSession) -> None
     with pytest.raises(InvalidStateTransitionError):
         deal.status = "debating"
 
+def test_same_state_transition() -> None:
+    # should not raise
+    validate_state_transition("created", "created")

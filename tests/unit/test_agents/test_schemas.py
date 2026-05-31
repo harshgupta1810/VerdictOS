@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from src.agents.schemas import (
     AgentAnalysisResult,
     AgentName,
+    Confidence,
     DispatchResult,
     Finding,
     FindingDimension,
@@ -269,3 +270,59 @@ class TestDispatchResult:
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError):
             DispatchResult(extra="data")  # type: ignore[call-arg]
+
+class TestConfidenceComparisons:
+    def test_compare_with_float(self) -> None:
+        assert Confidence.HIGH > 0.8
+        assert Confidence.HIGH >= 0.9
+        assert Confidence.MEDIUM > 0.4
+        assert Confidence.MEDIUM < 0.6
+        assert Confidence.MEDIUM <= 0.5
+        assert Confidence.SPECULATIVE < 0.2
+        assert Confidence.SPECULATIVE <= 0.1
+        
+        # eq
+        assert Confidence.HIGH == 0.85
+        assert Confidence.MEDIUM == 0.6
+        assert Confidence.SPECULATIVE == 0.2
+        
+    def test_compare_with_string_and_enum(self) -> None:
+        assert Confidence.HIGH > Confidence.MEDIUM
+        assert Confidence.MEDIUM > Confidence.SPECULATIVE
+        assert Confidence.SPECULATIVE < Confidence.MEDIUM
+        
+        assert Confidence.HIGH >= Confidence.MEDIUM
+        assert Confidence.MEDIUM <= Confidence.HIGH
+        
+        # with string
+        class DummyEnum:
+            value = "medium"
+        assert Confidence.HIGH > DummyEnum()
+        assert Confidence.SPECULATIVE < DummyEnum()
+        assert Confidence.HIGH >= DummyEnum()
+        assert Confidence.SPECULATIVE <= DummyEnum()
+        
+    def test_hash(self) -> None:
+        assert hash(Confidence.HIGH) == hash("high")
+        
+    def test_compare_with_unknown_string(self) -> None:
+        assert (Confidence.HIGH < "unknown") == ("high" < "unknown")
+        assert (Confidence.HIGH <= "unknown") == ("high" <= "unknown")
+        assert (Confidence.HIGH > "unknown") == ("high" > "unknown")
+        assert (Confidence.HIGH >= "unknown") == ("high" >= "unknown")
+
+    def test_finding_medium_confidence(self) -> None:
+        f = Finding(
+            id="123",
+            claim="test",
+            citation="test",
+            citation_chunk_id="test",
+            source_agent=AgentName.IP,
+            section_id="test",
+            confidence=0.6,
+            absolute_page=1,
+            dimension=FindingDimension.RISK_EXPOSURE,
+            domain="intellectual_property",
+            severity=Severity.MEDIUM,
+        )
+        assert f.confidence == Confidence.MEDIUM

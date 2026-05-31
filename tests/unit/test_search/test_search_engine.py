@@ -308,3 +308,159 @@ def test_index_persistence_caching(tmp_path: Path) -> None:
     assert loaded[1].chunk_id == "chunk:2"
 
 
+def test_search_resolves_section_with_clause_type_filter() -> None:
+    client = _SearchClient({
+        "hits": {
+            "hits": [
+                {
+                    "_score": 1.0,
+                    "_source": {
+                        "chunk_id": "agreement:1",
+                        "document_name": "agreement.pdf",
+                        "text": "The liability cap applies.",
+                        "section_id": "Section 1",
+                        "absolute_page": 0,
+                        "clause_type": "liability_cap",
+                        "references_sections": [],
+                        "defined_terms": {},
+                    }
+                },
+                {
+                    "_score": 1.0,
+                    "_source": {
+                        "chunk_id": "agreement:2",
+                        "document_name": "agreement.pdf",
+                        "text": "General text.",
+                        "section_id": "Section 1",
+                        "absolute_page": 0,
+                        "clause_type": "general",
+                        "references_sections": [],
+                        "defined_terms": {},
+                    }
+                }
+            ]
+        }
+    })
+    
+    results = SparseSearchEngine(client, index_name="verdictos_documents").search(
+        SearchQuery(text="Section 1", filters=SearchFilters(clause_types=[ClauseType.LIABILITY_CAP]))
+    )
+    
+    assert len(results) == 1
+    assert results[0].clause_type == ClauseType.LIABILITY_CAP
+    assert results[0].chunk_id == "agreement:1"
+
+
+def test_resolve_section_reference_with_document_name_and_exception() -> None:
+    client_err = _SearchClient(ConnectionError("fail"))
+    
+    with pytest.raises(SearchEngineError, match="Elasticsearch section resolve failed"):
+        SparseSearchEngine(client_err, index_name="idx").resolve_section_reference("Section 1", document_name="doc.pdf")
+
+
+def test_fetch_sections_success_and_document_name_filter() -> None:
+    client = _SearchClient({
+        "hits": {
+            "hits": [
+                {
+                    "_score": 1.0,
+                    "_source": {
+                        "chunk_id": "agreement:1",
+                        "document_name": "doc.pdf",
+                        "text": "General text.",
+                        "section_id": "Section 1",
+                        "absolute_page": 0,
+                        "clause_type": "general",
+                        "references_sections": [],
+                        "defined_terms": {},
+                    }
+                }
+            ]
+        }
+    })
+    
+    results = SparseSearchEngine(client, index_name="idx").fetch_sections(["Section 1"], document_name="doc.pdf", size=5)
+    assert len(results) == 1
+    assert results[0].chunk_id == "agreement:1"
+    
+    sent_request = client.requests[0]
+    filters = sent_request["query"]["bool"]["filter"]
+    assert {"terms": {"section_id": ["Section 1"]}} in filters
+    assert {"term": {"document_name": "doc.pdf"}} in filters
+
+
+def test_fetch_sections_exception() -> None:
+    client_err = _SearchClient(ConnectionError("fail"))
+    with pytest.raises(SearchEngineError, match="Elasticsearch section fetch failed"):
+        SparseSearchEngine(client_err, index_name="idx").fetch_sections(["Section 1"])
+def test_build_search_request_with_expanded_terms() -> None:
+    request = build_search_request(
+        SearchQuery(
+            text="breach",
+            expanded_terms=["violation", "infringement"],
+            filters=SearchFilters(),
+            size=5
+        )
+    )
+    
+    assert request["query"]["bool"]["must"][0] == {
+        "bool": {
+            "should": [
+                {"match_phrase": {"text": "breach"}},
+                {"match_phrase": {"text": "violation"}},
+                {"match_phrase": {"text": "infringement"}}
+            ],
+            "minimum_should_match": 1
+        }
+    }
+
+
+def test_get_synonym_list_import_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.search.indexer import get_synonym_list
+    import builtins
+    
+    original_import = builtins.__import__
+    def mock_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "src.agents.planner_agent":
+            raise ImportError("Mocked ImportError")
+        return original_import(name, globals, locals, fromlist, level)
+        
+    monkeypatch.setattr("builtins.__import__", mock_import)
+    assert get_synonym_list() == []
+
+
+def test_index_chunks_raises_search_engine_error() -> None:
+    def broken_bulk_writer(_client: object, _actions: list[dict[str, object]], **_kwargs: object) -> tuple[int, list[dict]]:
+        raise ValueError("simulated bulk failure")
+    
+    indexer = ElasticsearchIndexer(_Client(), index_name="idx", bulk_writer=broken_bulk_writer)
+    with pytest.raises(SearchEngineError, match="Elasticsearch bulk indexing failed"):
+        indexer.index_chunks([_chunk(chunk_id="c1")])
+
+
+def test_save_index_cache_handles_corrupt_existing_file(tmp_path: Path) -> None:
+    cache_file = tmp_path / "cache.json"
+    cache_file.write_text("invalid json")
+    
+    indexer = ElasticsearchIndexer(_Client(), index_name="idx")
+    chunk1 = _chunk(chunk_id="c1")
+    indexer.save_index_cache([chunk1], filepath=str(cache_file))
+    
+    loaded = indexer.load_index_cache(filepath=str(cache_file))
+    assert len(loaded) == 1
+    assert loaded[0].chunk_id == "c1"
+
+
+def test_load_index_cache_missing_file(tmp_path: Path) -> None:
+    cache_file = tmp_path / "missing.json"
+    indexer = ElasticsearchIndexer(_Client(), index_name="idx")
+    assert indexer.load_index_cache(filepath=str(cache_file)) == []
+
+
+def test_load_index_cache_corrupt_file(tmp_path: Path) -> None:
+    cache_file = tmp_path / "corrupt.json"
+    cache_file.write_text("not a list of dicts")
+    indexer = ElasticsearchIndexer(_Client(), index_name="idx")
+    assert indexer.load_index_cache(filepath=str(cache_file)) == []
+
+

@@ -69,3 +69,14 @@ def test_classifier_enriches_chunk_without_mutating_source() -> None:
 
 def test_classifier_defines_terms_for_every_non_general_clause_type() -> None:
     assert set(CLAUSE_TYPE_TERMS) == set(ClauseType) - {ClauseType.GENERAL}
+
+
+def test_classifier_returns_general_if_confidence_below_minimum(monkeypatch: pytest.MonkeyPatch) -> None:
+    import src.ingestion.classifier as classifier_mod
+    monkeypatch.setattr(classifier_mod, "MIN_CLASSIFICATION_CONFIDENCE", 1.0)
+    
+    result = ClauseClassifier().classify("This text mentions a tax.")
+    
+    assert result.clause_type is ClauseType.GENERAL
+    assert result.confidence < 1.0
+    assert result.matched_terms == ["tax"]

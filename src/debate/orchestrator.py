@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from src.agents.schemas import Finding, FindingDimension
 from src.debate.audit import persist_round_transcript
 from src.debate.compressor import compress_round_context, serialize_round_summary
+from src.debate.consensus import run_consensus_mapping
 from src.debate.executor import execute_dimension_debate
 from src.debate.schemas import DebateArgument, DebatePersona, DimensionState
 from src.debate.state_tracker import DimensionStateTracker
@@ -291,6 +292,9 @@ async def run_debate_loop(
                 context_by_dim[dim] = serialize_round_summary(comp_summary)
 
         round_number += 1
+
+    # Phase 5: Consensus Mapping (run before persistence)
+    run_consensus_mapping(all_debate_arguments, state_tracker)
 
     # Persist final states to database
     await state_tracker.persist(db_session)

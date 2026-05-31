@@ -104,6 +104,19 @@ class TestPersistDebateArgument:
         db_record = mock_session.add.call_args[0][0]
         assert db_record.dropout_flag is True
 
+    @pytest.mark.asyncio
+    async def test_rollback_on_commit_failure(self) -> None:
+        mock_session = AsyncMock()
+        mock_session.add = MagicMock()
+        mock_session.commit.side_effect = Exception("DB failure")
+
+        with pytest.raises(Exception, match="DB failure"):
+            await persist_debate_argument(
+                "deal-1", _make_arg(), mock_session
+            )
+
+        mock_session.rollback.assert_called_once()
+
 
 class TestPersistRoundTranscript:
     @pytest.mark.asyncio

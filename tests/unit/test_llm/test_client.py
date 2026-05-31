@@ -151,6 +151,36 @@ class TestOllamaClientGenerate:
             with pytest.raises(LLMClientError, match="timed out"):
                 await client.generate(_build_request())
 
+    @pytest.mark.asyncio
+    async def test_generate_with_system_prompt_and_max_tokens(self) -> None:
+        mock_resp = _mock_httpx_response({"model": "llama3", "response": "done"})
+        mock_client_instance = AsyncMock()
+        mock_client_instance.post = AsyncMock(return_value=mock_resp)
+        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_instance.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("src.llm.client.httpx.AsyncClient", return_value=mock_client_instance):
+            client = OllamaClient("http://localhost:11434")
+            req = LLMRequest(model="llama3", user_prompt="test", system_prompt="sys", max_tokens=100)
+            await client.generate(req)
+            
+            call_kwargs = mock_client_instance.post.call_args[1]
+            payload = call_kwargs["json"]
+            assert payload["system"] == "sys"
+            assert payload["options"]["num_predict"] == 100
+
+    @pytest.mark.asyncio
+    async def test_generate_http_error_raises_llm_error(self) -> None:
+        mock_client_instance = AsyncMock()
+        mock_client_instance.post = AsyncMock(side_effect=httpx.HTTPError("http error"))
+        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_instance.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("src.llm.client.httpx.AsyncClient", return_value=mock_client_instance):
+            client = OllamaClient("http://localhost:11434")
+            with pytest.raises(LLMClientError, match="Ollama HTTP error: http error"):
+                await client.generate(_build_request())
+
 
 # ---------------------------------------------------------------------------
 # OllamaClient.generate_with_schema() tests (Pydantic auto-retry)
@@ -220,6 +250,21 @@ class TestOllamaClientGenerateWithSchema:
 
         result = await client.generate_with_schema(_build_request(), _MockFinding, max_retries=1)
         assert result.claim == "Found issue"
+
+    @pytest.mark.asyncio
+    async def test_non_json_on_retry_exhausts(self) -> None:
+        """Non-JSON on retry exhausts and raises error."""
+        client = OllamaClient("http://localhost:11434")
+
+        client.generate = AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                LLMResponse(model="llama3", raw_text="bad 1", parsed_json=None),
+                LLMResponse(model="llama3", raw_text="bad 2", parsed_json=None),
+            ],
+        )
+
+        with pytest.raises(SchemaRetryExhaustedError, match="LLM returned non-JSON text: bad 2"):
+            await client.generate_with_schema(_build_request(), _MockFinding, max_retries=1)
 
 
 # ---------------------------------------------------------------------------

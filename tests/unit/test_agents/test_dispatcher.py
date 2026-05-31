@@ -249,6 +249,18 @@ class TestRunParallelAnalysis:
         assert result.agents_dispatched == 2
         assert result.total_findings == 0
 
+    @pytest.mark.asyncio
+    async def test_run_parallel_analysis_empty_agents(self) -> None:
+        mock_preflight = MagicMock()
+        mock_preflight.specialist_manifest = MagicMock()
+        mock_preflight.specialist_manifest.active_agents = ["unknown_agent_404"]
+        
+        result = await run_parallel_analysis(
+            mock_preflight, AsyncMock(), AsyncMock(),
+        )
+        assert result.agents_dispatched == 0
+        assert result.total_findings == 0
+
 
 # ---------------------------------------------------------------------------
 # deduplicate_findings

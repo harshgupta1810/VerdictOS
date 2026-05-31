@@ -168,6 +168,34 @@ class TestGateCPassageAccuracy:
         result = gate_c_passage_accuracy(arg, engine)
         assert result.confidence == Confidence.HIGH
 
+    def test_passage_resolved_via_section_reference(self) -> None:
+        arg = _make_arg(
+            argument="The risk is clearly documented in the contract clause.",
+            citations=["Section 4.2"],
+            bm25_verified=True,
+            confidence="high",
+        )
+        engine = _mock_search_engine(
+            fetch_returns=[],  # fetch fails
+            resolve_returns=[_make_search_result("Section 4.2", "The risk is clearly documented in the contract clause.")]
+        )
+        result = gate_c_passage_accuracy(arg, engine)
+        assert result.confidence == Confidence.HIGH
+
+    def test_passage_not_found_skips_citation(self) -> None:
+        arg = _make_arg(
+            argument="The risk is clearly documented in the contract clause.",
+            citations=["chunk-1"],
+            bm25_verified=True,
+            confidence="high",
+        )
+        engine = _mock_search_engine(
+            fetch_returns=[],
+            resolve_returns=[]
+        )
+        result = gate_c_passage_accuracy(arg, engine)
+        assert result.confidence == Confidence.HIGH
+
 
 class TestTokenOverlapRatio:
     def test_identical_strings(self) -> None:

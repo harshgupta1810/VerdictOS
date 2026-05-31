@@ -1,5 +1,7 @@
 """Tests for section-aware document chunker."""
 
+import pytest
+
 from src.ingestion.chunker import SectionAwareChunker, count_tokens, extract_section_references, split_clauses
 from src.ingestion.schemas import ParsedDocument, ParsedPage
 
@@ -172,3 +174,62 @@ def test_defined_terms_extraction() -> None:
     assert "Intellectual Property" not in mapped[0].defined_terms
     assert mapped[1].defined_terms == {}
 
+
+def test_empty_lines_ignored() -> None:
+    document = _document(["\n\nSection 1. A\n\n\nClause 1.\n   \nClause 2."])
+    chunks = SectionAwareChunker().chunk(document)
+    assert len(chunks) == 1
+
+
+def test_invalid_headers_ignored() -> None:
+    document = _document([
+        "Section 1. This is a very long section header that has way too many words in it to be considered valid by the chunker.",
+        "Section 2. Ends with semicolon;",
+        "Clause text."
+    ])
+    chunks = SectionAwareChunker().chunk(document)
+    assert chunks[0].section_id == "document_root"
+
+
+def test_chunker_merge_up_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    import src.ingestion.chunker as chunker_mod
+    
+    call_counts = {"c": 0}
+    
+    def mock_count_tokens(text: str) -> int:
+        call_counts["c"] += 1
+        c = call_counts["c"]
+        if c == 1: return 400
+        if c == 2: return 200
+        if c == 3: return 100
+        if c == 4: return 450
+        return 0
+        
+    monkeypatch.setattr(chunker_mod, "count_tokens", mock_count_tokens)
+    
+    document = _document(["Clause 1. Clause 2."])
+    chunks = chunker_mod.SectionAwareChunker().chunk(document)
+    assert len(chunks) == 1
+
+
+def test_defined_terms_empty_lines() -> None:
+    from src.ingestion.defined_terms import DefinedTermsExtractor
+    
+    document = _document([
+        "Section 1. Definitions\n\n  \n\"Term\" means something."
+    ])
+    extractor = DefinedTermsExtractor()
+    definitions = extractor.extract_definitions(document)
+    assert definitions["Term"] == "something"
+
+def test_defined_terms_empty_definitions() -> None:
+    from src.ingestion.defined_terms import DefinedTermsExtractor
+    from src.ingestion.schemas import DocumentChunk
+    
+    extractor = DefinedTermsExtractor()
+    chunk = DocumentChunk(
+        chunk_id="c", document_name="d", chunk_index=0, text="a", section_id="s", absolute_page=0
+    )
+    result = extractor.map_defined_terms_to_chunks([chunk], {})
+    assert len(result) == 1
+    assert result[0].defined_terms == {}

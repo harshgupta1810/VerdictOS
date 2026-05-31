@@ -154,3 +154,19 @@ class TestEstimateTokens:
 
     def test_scales_with_length(self) -> None:
         assert _estimate_tokens("a" * 400) > _estimate_tokens("a" * 40)
+
+
+def test_compress_round_empty_raises_error() -> None:
+    with pytest.raises(ValueError, match="Cannot compress empty round"):
+        compress_round_context([], 1)
+
+
+def test_estimate_token_reduction_empty_args() -> None:
+    from src.debate.schemas import RoundSummary
+    summary = RoundSummary(
+        round_number=1,
+        dimension=FindingDimension.RISK_EXPOSURE,
+        persona_summaries=[],
+        dimension_state=DimensionState.ACTIVE,
+    )
+    assert estimate_token_reduction([], summary) == 0.0

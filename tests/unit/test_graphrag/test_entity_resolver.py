@@ -218,3 +218,97 @@ def test_tier_3_gating(monkeypatch: pytest.MonkeyPatch) -> None:
     assert res.status == "unconfirmed_node"
     assert len(llm_calls) == 0  # Gated out since score is 0.50
 
+
+def test_strip_roles_returns_original_if_all_words_stripped() -> None:
+    from src.graphrag.entity_resolver import strip_roles
+    assert strip_roles("CEO Director") == "CEO Director"
+
+
+def test_person_match_empty_names() -> None:
+    from src.graphrag.entity_resolver import person_match
+    assert person_match("!", "") == False
+    assert person_match("", "A B") == False
+
+
+def test_person_match_variations() -> None:
+    from src.graphrag.entity_resolver import person_match
+    # n1[1] == n2[0]
+    assert person_match("J Smith", "Smith J") == True
+    
+    # n1[0] == n2[0]
+    assert person_match("Smith J", "Smith John") == True
+
+
+def test_ollama_disambiguator() -> None:
+    from src.graphrag.entity_resolver import OllamaDisambiguator
+    from src.graphrag.schemas import LLMEntityResolution
+    
+    class MockClient:
+        async def generate_with_schema(self, req, schema):
+            if req.model == "error":
+                raise Exception("LLM Error")
+            return LLMEntityResolution(merge=True, canonical_name="Matched", confidence=0.9, reason="test")
+
+    client = MockClient()
+    disambiguator = OllamaDisambiguator(client, "test-model")
+    
+    result = disambiguator.disambiguate(name="A", entity_type="person", candidates=["B"])
+    assert result["merge"] is True
+    assert result["canonical_name"] == "Matched"
+    
+    error_disambiguator = OllamaDisambiguator(client, "error")
+    res = error_disambiguator.disambiguate(name="A", entity_type="person", candidates=["B"])
+    assert res["merge"] is False
+    assert "LLM call failed" in res["reason"]
+
+
+def test_registered_entities() -> None:
+    resolver = EntityResolver()
+    resolver.register("A", "person")
+    assert resolver.registered_entities("person") == ["A"]
+
+
+def test_person_match_unmatched() -> None:
+    from src.graphrag.entity_resolver import person_match
+    assert person_match("John Smith", "Adam Smith") == False
+
+
+def test_ollama_disambiguator_running_loop(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.graphrag.entity_resolver import OllamaDisambiguator
+    from src.graphrag.schemas import LLMEntityResolution
+    import sys
+    import asyncio
+    
+    class MockNestAsyncio:
+        @staticmethod
+        def apply():
+            pass
+            
+    monkeypatch.setitem(sys.modules, "nest_asyncio", MockNestAsyncio())
+    
+    class MockLoop:
+        def is_running(self):
+            return True
+        def run_until_complete(self, coro):
+            return asyncio.run(coro)
+            
+    monkeypatch.setattr(asyncio, "get_event_loop", lambda: MockLoop())
+    
+    class MockClient:
+        async def generate_with_schema(self, req, schema):
+            return LLMEntityResolution(merge=True, canonical_name="Matched", confidence=0.9, reason="test")
+
+    client = MockClient()
+    disambiguator = OllamaDisambiguator(client, "test-model")
+    
+    result = disambiguator.disambiguate(name="A", entity_type="person", candidates=["B"])
+    assert result["merge"] is True
+
+
+def test_llm_entity_resolution_requires_canonical_name_if_merge() -> None:
+    from src.graphrag.schemas import LLMEntityResolution
+    from pydantic import ValidationError
+    
+    with pytest.raises(ValidationError, match="canonical_name is required when merge is true"):
+        LLMEntityResolution(merge=True, confidence=1.0, reason="test")
+

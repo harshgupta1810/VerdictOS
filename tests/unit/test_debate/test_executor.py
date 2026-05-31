@@ -120,6 +120,34 @@ class TestExecuteDimensionDebate:
         assert len(dropout_args) == 1
 
     @pytest.mark.asyncio
+    async def test_unexpected_exception_logged(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def _mock_gate_a(*args: Any, **kwargs: Any) -> DebateArgument:
+            if kwargs.get("persona") == DebatePersona.CRITIC:
+                raise ValueError("Random error")
+            return _make_arg(persona="proponent")
+            
+        monkeypatch.setattr("src.debate.executor.gate_a_argument_generator", _mock_gate_a)
+
+        args, state = await execute_dimension_debate(
+            dimension=FindingDimension.RISK_EXPOSURE,
+            finding_id="finding-1",
+            finding_claim="Risk",
+            finding_citation="Section 1",
+            finding_confidence="medium",
+            core_question="Q?",
+            round_number=1,
+            active_personas=[
+                DebatePersona.PROPONENT,
+                DebatePersona.CRITIC,
+            ],
+            llm_client=AsyncMock(),
+            search_engine=_mock_search_engine(),
+            previous_arguments=[],
+        )
+
+        assert len(args) == 1
+
+    @pytest.mark.asyncio
     async def test_all_personas_fail_returns_unresolved(self) -> None:
         mock_client = AsyncMock()
         mock_client.generate_with_schema.side_effect = RuntimeError("All fail")

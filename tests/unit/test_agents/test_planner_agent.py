@@ -231,3 +231,65 @@ def _chunk(
         absolute_page=0,
         clause_type=clause_type,
     )
+
+def test_resolve_section_pointers_fetches_new_sections() -> None:
+    from src.search.schemas import SearchResult
+    from src.agents.planner_agent import resolve_section_pointers
+    from unittest.mock import MagicMock
+
+    search_engine = MagicMock()
+    search_engine.fetch_sections.return_value = [
+        SearchResult(document_name="doc", chunk_id="chunk2", section_id="sec2", text="hello", absolute_page=1, score=1.0, clause_type=ClauseType.GENERAL)
+    ]
+    
+    results = [
+        SearchResult(document_name="doc", chunk_id="chunk1", section_id="sec1", text="test", absolute_page=1, score=1.0, clause_type=ClauseType.GENERAL, references_sections=["sec2", "sec1"])
+    ]
+    
+    out = resolve_section_pointers(results, search_engine, max_additional=1)
+    assert len(out) == 2
+    
+    search_engine.fetch_sections.side_effect = Exception("db error")
+    out = resolve_section_pointers(results, search_engine, max_additional=1)
+    assert len(out) == 1
+    
+    # Test early return when no references are made
+    results_no_ref = [
+        SearchResult(document_name="doc", chunk_id="chunk3", section_id="sec3", text="test", absolute_page=1, score=1.0, clause_type=ClauseType.GENERAL, references_sections=[])
+    ]
+    out_no_ref = resolve_section_pointers(results_no_ref, search_engine, max_additional=1)
+    assert out_no_ref == results_no_ref
+
+def test_planner_plan_with_llm_json_decode_error() -> None:
+    from unittest.mock import patch, MagicMock
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"response": "not json"}
+    with patch("httpx.post", return_value=mock_resp):
+        manifest = PlannerAgent().plan(document_names=["doc1.pdf"], chunks=[])
+    assert manifest.used_fallback is True
+
+def test_planner_plan_with_llm_validation_error() -> None:
+    from unittest.mock import patch, MagicMock
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"response": '{"invalid": "schema"}'}
+    with patch("httpx.post", return_value=mock_resp):
+        manifest = PlannerAgent().plan(document_names=["doc1.pdf"], chunks=[])
+    assert manifest.used_fallback is True
+
+def test_planner_plan_with_llm_value_error_bad_agent() -> None:
+    from unittest.mock import patch, MagicMock
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"response": '{"active_agents": ["invalid_agent"], "document_type_map": {}}'}
+    with patch("httpx.post", return_value=mock_resp):
+        manifest = PlannerAgent().plan(document_names=["doc1.pdf"], chunks=[])
+    assert manifest.used_fallback is True
+
+def test_planner_plan_with_llm_empty_docs() -> None:
+    manifest = PlannerAgent().plan(document_names=[], chunks=[])
+    assert manifest.used_fallback is True
+
+def test_planner_plan_catches_generic_exception() -> None:
+    from unittest.mock import patch
+    with patch.object(PlannerAgent, "_plan_with_llm", side_effect=RuntimeError("foo")):
+        manifest = PlannerAgent().plan(document_names=["doc"], chunks=[])
+    assert manifest.used_fallback is True

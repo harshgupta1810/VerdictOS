@@ -37,11 +37,7 @@ def compress_round_context(
     full transcript.
     """
     if not arguments:
-        return RoundSummary(
-            round_number=round_number,
-            dimension=arguments[0].dimension if arguments else arguments[0].dimension,
-            dimension_state=dimension_state,
-        )
+        raise ValueError("Cannot compress empty round")
 
     dimension = arguments[0].dimension
 

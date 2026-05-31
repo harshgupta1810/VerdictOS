@@ -225,6 +225,7 @@ def _chunk(
     *,
     chunk_id: str,
     text: str,
+    section_id: str = "Section 1",
     references_sections: list[str] | None = None,
 ) -> DocumentChunk:
     return DocumentChunk(
@@ -232,7 +233,42 @@ def _chunk(
         document_name="agreement.pdf",
         chunk_index=0,
         text=text,
-        section_id="Section 1",
+        section_id=section_id,
         absolute_page=0,
         references_sections=references_sections or [],
     )
+
+
+def test_build_graph_upserts_existing_edges() -> None:
+    chunks = [
+        _chunk(chunk_id="agreement:0", text="source1", section_id="s1"),
+        _chunk(chunk_id="agreement:1", text="source2", section_id="s2", references_sections=["Section 9.4"]),
+        _chunk(chunk_id="agreement:2", text="source3", section_id="s3", references_sections=["Section 9.4"]),
+    ]
+    nlp = _MappedNLP(
+        {
+            "source1": [
+                _Entity("Acme Corp.", "ORG"),
+                _Entity("Ada Smith", "PERSON"),
+            ],
+            "source2": [
+                _Entity("Acme Corp.", "ORG"),
+                _Entity("Ada Smith", "PERSON"),
+            ],
+            "source3": [
+                _Entity("Acme Corp.", "ORG"),
+            ]
+        }
+    )
+
+    graph = GraphConstructor(nlp=nlp).build_graph(chunks)
+    
+    entity_nodes = [
+        node_id
+        for node_id, attributes in graph.nodes(data=True)
+        if attributes["node_type"] == "entity"
+    ]
+    edge = graph.edges[entity_nodes[0], entity_nodes[1]]
+    assert "agreement:0" in edge["chunk_ids"]
+    assert "agreement:1" in edge["chunk_ids"]
+
