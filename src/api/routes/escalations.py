@@ -15,6 +15,35 @@ from src.api.middleware.validation import validate_deal_state
 
 router = APIRouter(prefix="/deals/{id}/escalations", tags=["escalations"])
 
+
+@router.get("")
+async def list_escalations(
+    db: AsyncSession = Depends(get_db),
+    deal: Deal = Depends(validate_deal_state),
+):
+    """List all escalations for a deal."""
+    result = await db.execute(
+        select(Escalation).where(Escalation.deal_id == deal.deal_id)
+    )
+    escalations = result.scalars().all()
+    return {
+        "escalations": [
+            {
+                "escalation_id": e.escalation_id,
+                "deal_id": e.deal_id,
+                "finding_id": e.finding_id,
+                "status": e.status,
+                "decision": e.decision,
+                "decision_text": e.decision_text,
+                "resolved_by": e.resolved_by,
+                "created_at": e.created_at.isoformat(),
+                "resolved_at": e.resolved_at.isoformat() if e.resolved_at else None,
+            }
+            for e in escalations
+        ]
+    }
+
+
 @router.post("/{eid}/resolve")
 async def resolve_escalation(
     eid: str,

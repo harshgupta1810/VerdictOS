@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # Database
     database_url: str = Field(default="sqlite+aiosqlite:///./verdictos.db")
 
+    # File uploads
+    upload_dir: str = Field(default="./data/uploads")
+
     # Gateway / JWT Security
     jwt_secret: str = Field(default=_INSECURE_DEFAULT)
     jwt_algorithm: str = Field(default="HS256")

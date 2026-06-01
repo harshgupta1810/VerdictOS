@@ -25,6 +25,22 @@ from src.workers.tasks import run_deal_pipeline
 router = APIRouter(prefix="/deals", tags=["deals"])
 
 
+@router.get("")
+async def list_deals(db: AsyncSession = Depends(get_db)):
+    """List all deals."""
+    result = await db.execute(select(Deal).order_by(Deal.deal_id))
+    deals = result.scalars().all()
+    return [
+        {
+            "deal_id": d.deal_id,
+            "client_id": d.client_id,
+            "status": d.status,
+            "metadata": d.metadata_json,
+        }
+        for d in deals
+    ]
+
+
 @router.post("", status_code=201)
 async def create_deal(
     request: DealCreateRequest,
