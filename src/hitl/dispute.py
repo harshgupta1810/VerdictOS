@@ -39,6 +39,19 @@ def handle_user_dispute(db: Session, deal_id: str, finding_id: str, request: Dis
         
     elif request.scenario == "B":
         # Scenario B: False Negative
+        # Re-open the dimension state to active
+        from src.db.models import Finding, DimensionStateRecord
+        from sqlalchemy import select
+        finding = db.get(Finding, finding_id)
+        if finding:
+            stmt = select(DimensionStateRecord).where(
+                DimensionStateRecord.deal_id == deal_id,
+                DimensionStateRecord.dimension == finding.dimension
+            )
+            dim_record = db.execute(stmt).scalar_one_or_none()
+            if dim_record:
+                dim_record.state = "active"
+                
         # Accept uploaded document or clause pointer, trigger delta re-analysis
         trigger_delta_reanalysis(
             db=db, 

@@ -149,3 +149,39 @@ async def run_deal_pipeline(deal_id: str, document_paths: list[str], is_delta: b
                 deal.status = "error"
                 await db.commit()
                 await emit_pipeline_event(deal_id, "error", {"message": str(e)})
+
+from datetime import datetime, timedelta, timezone
+from sqlalchemy import select
+from src.db.models import Escalation
+
+async def enforce_escalation_sla(timeout_hours: int = 24):
+    """
+    Background job that monitors pending escalations.
+    If an escalation remains unresolved past the SLA timeout, it drops the
+    associated deal by marking the escalation as 'timed_out' and the deal as 'error'.
+    """
+    logger.info(f"Checking escalation SLA (timeout: {timeout_hours}h)")
+    async with AsyncSessionLocal() as db:
+        # Use timezone-naive datetime if your DB uses naive (utcnow default in models.py)
+        # Using naive utcnow() since models.py uses datetime.utcnow
+        cutoff = datetime.utcnow() - timedelta(hours=timeout_hours)
+        
+        stmt = select(Escalation).where(
+            Escalation.status == "pending",
+            Escalation.created_at < cutoff
+        )
+        result = await db.execute(stmt)
+        escalations = result.scalars().all()
+        
+        dropped_deals = []
+        for esc in escalations:
+            esc.status = "timed_out"
+            deal = await db.get(Deal, esc.deal_id)
+            if deal and deal.status not in ["complete", "error"]:
+                deal.status = "error"
+                dropped_deals.append(deal.deal_id)
+                await emit_pipeline_event(deal.deal_id, "error", {"message": "Escalation SLA timeout."})
+                
+        await db.commit()
+        return dropped_deals
+

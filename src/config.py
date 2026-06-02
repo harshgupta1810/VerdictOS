@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # Local LLMs
     ollama_url: str = Field(default="http://localhost:11434")
-    llm_reasoning_model: str = Field(default="llama3")
+    llm_reasoning_model: str = Field(default="llama3:8b")
     llm_disambiguation_model: str = Field(default="qwen2.5")
 
     # Redis (Queue and Cache)
