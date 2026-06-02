@@ -24,7 +24,7 @@ from src.common.logging import configure_logging
 from src.api.schemas.responses import ErrorResponse, HealthResponse
 from fastapi.middleware.cors import CORSMiddleware
 from src.api.middleware.auth import APIKeyMiddleware
-from src.api.routes import deals, escalations
+from src.api.routes import deals, escalations, upload
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +90,7 @@ def create_app() -> FastAPI:
     
     application.include_router(deals.router, prefix="/api/v1")
     application.include_router(escalations.router, prefix="/api/v1")
+    application.include_router(upload.router, prefix="/api/v1")
 
     # -----------------------------------------------------------------------
     # Global exception handlers

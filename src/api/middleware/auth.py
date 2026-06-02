@@ -26,7 +26,8 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         if request.url.path in EXEMPT_PATHS or request.method == "OPTIONS":
             return await call_next(request)
             
-        api_key = request.headers.get(API_KEY_NAME)
+        # Accept key from header or query param (query param needed for WebSocket upgrades)
+        api_key = request.headers.get(API_KEY_NAME) or request.query_params.get("api_key")
         if not api_key or api_key not in VALID_API_KEYS:
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,

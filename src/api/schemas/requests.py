@@ -12,10 +12,14 @@ class DealCreateRequest(BaseModel):
     """Payload for creating a new deal."""
     
     model_config = ConfigDict(extra="forbid")
-    
+
     client_id: str = Field(..., description="The ID of the client creating the deal.")
     metadata_json: dict[str, Any] | None = Field(default=None, description="Optional metadata for the deal.")
     document_paths: list[str] = Field(..., min_length=1, description="List of file paths to the documents to ingest.")
+    selected_agents: list[str] | None = Field(
+        default=None,
+        description="Optional list of agent IDs to activate. If omitted, the planner auto-assigns agents."
+    )
 
 
 class DisputeRequest(BaseModel):
