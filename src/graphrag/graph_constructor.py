@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from collections.abc import Callable, Iterable
 from itertools import permutations
 from pathlib import Path
@@ -23,6 +24,8 @@ from networkx.readwrite import json_graph
 from src.graphrag.entity_resolver import EntityResolver, normalize_entity_name
 from src.graphrag.schemas import EntityResolution, EntityType, ExtractedEntity
 from src.ingestion.schemas import DocumentChunk
+
+logger = logging.getLogger(__name__)
 
 ENTITY_LABEL_MAP: dict[str, EntityType] = {
     "ORG": "organization",
@@ -45,7 +48,7 @@ class GraphConstructor:
         nlp: Callable[[str], Any] | None = None,
         resolver: EntityResolver | None = None,
     ) -> None:
-        self._nlp = nlp or spacy.load("en_core_web_lg")
+        self._nlp = nlp or _load_default_nlp()
         self._resolver = resolver or EntityResolver()
 
     def extract_entities(self, chunks: Iterable[DocumentChunk]) -> list[ExtractedEntity]:
@@ -139,6 +142,17 @@ class GraphConstructor:
             # aliases of this entity can resolve against it.
             self._resolver.register(entity.name, entity.entity_type, document_name=entity.document_name)
         return resolution
+
+
+def _load_default_nlp() -> Callable[[str], Any]:
+    try:
+        return spacy.load("en_core_web_lg")
+    except OSError:
+        logger.warning(
+            "spaCy model en_core_web_lg is not installed; falling back to blank English pipeline. "
+            "GraphRAG entity extraction will be limited until the model is installed."
+        )
+        return spacy.blank("en")
 
 
 def _entity_node_id(resolution: EntityResolution) -> str:
